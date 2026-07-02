@@ -36,14 +36,14 @@ export function MessageInput({
 
   return (
     <div className="space-y-2 border-t bg-card/60 p-3">
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
         {QUICK_EMOJIS.map((emoji) => (
           <button
             key={emoji}
             type="button"
             onClick={() => send(emoji)}
             disabled={sending}
-            className="rounded-full bg-muted px-2.5 py-1 text-lg transition-transform hover:scale-125 active:scale-95"
+            className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-lg transition-transform hover:scale-125 active:scale-95"
           >
             {emoji}
           </button>

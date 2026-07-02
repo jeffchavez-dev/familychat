@@ -16,7 +16,9 @@ create table if not exists threads (
   is_group boolean not null default false,
   name text,
   created_by uuid references profiles (id),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  theme text,
+  background_url text
 );
 
 create table if not exists thread_participants (
@@ -110,6 +112,11 @@ create policy "signed-in users can create threads"
   on threads for insert
   with check (auth.role() = 'authenticated');
 
+create policy "participants can update their threads"
+  on threads for update
+  using (is_thread_participant(id))
+  with check (is_thread_participant(id));
+
 create policy "participants can view thread membership"
   on thread_participants for select
   using (is_thread_participant(thread_id));
@@ -147,6 +154,7 @@ create policy "users manage their own push subscriptions"
 -- Realtime: broadcast changes on messages and read receipts
 alter publication supabase_realtime add table messages;
 alter publication supabase_realtime add table message_reads;
+alter publication supabase_realtime add table threads;
 
 -- Storage bucket for chat attachments (photos/files)
 insert into storage.buckets (id, name, public)

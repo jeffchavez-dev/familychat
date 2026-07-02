@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getSignedAttachmentUrl } from "@/lib/supabase/queries";
+import { useSignedUrl } from "@/lib/supabase/use-signed-url";
 
 export function Attachment({
   path,
@@ -10,17 +9,7 @@ export function Attachment({
   path: string;
   type: string | null;
 }) {
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    getSignedAttachmentUrl(path).then((signed) => {
-      if (!cancelled) setUrl(signed);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [path]);
+  const url = useSignedUrl(path);
 
   if (!url) {
     return <div className="h-32 w-48 animate-pulse rounded-md bg-muted" />;

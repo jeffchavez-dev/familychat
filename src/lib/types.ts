@@ -10,6 +10,8 @@ export type Thread = {
   name: string | null;
   created_at: string;
   participants: Profile[];
+  theme: string | null;
+  background_url: string | null;
 };
 
 export type Message = {

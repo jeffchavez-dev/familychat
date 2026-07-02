@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { usePresence } from "@/lib/supabase/use-presence";
+import { cn } from "@/lib/utils";
 import {
   createThread,
   fetchMessages,
   fetchThreads,
   markMessageRead,
   sendMessage,
+  setThreadBackgroundPhoto,
+  setThreadTheme,
   uploadAttachment,
 } from "@/lib/supabase/queries";
 import { Sidebar } from "@/components/chat/sidebar";
@@ -75,6 +78,24 @@ export function ChatApp({
           );
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "threads",
+          filter: `id=eq.${selectedThreadId}`,
+        },
+        (payload) => {
+          const { theme, background_url } = payload.new as {
+            theme: string | null;
+            background_url: string | null;
+          };
+          setThreads((prev) =>
+            prev.map((t) => (t.id === selectedThreadId ? { ...t, theme, background_url } : t)),
+          );
+        },
+      )
       .subscribe();
 
     return () => {
@@ -122,36 +143,69 @@ export function ChatApp({
     [currentUser.id],
   );
 
+  const handleSetTheme = useCallback(
+    async (theme: string | null) => {
+      if (!selectedThreadId) return;
+      await setThreadTheme(selectedThreadId, theme);
+      setThreads((prev) =>
+        prev.map((t) =>
+          t.id === selectedThreadId ? { ...t, theme, background_url: null } : t,
+        ),
+      );
+    },
+    [selectedThreadId],
+  );
+
+  const handleSetBackgroundPhoto = useCallback(
+    async (file: File) => {
+      if (!selectedThreadId) return;
+      const path = await setThreadBackgroundPhoto(selectedThreadId, file);
+      setThreads((prev) =>
+        prev.map((t) =>
+          t.id === selectedThreadId ? { ...t, background_url: path, theme: null } : t,
+        ),
+      );
+    },
+    [selectedThreadId],
+  );
+
   const selectedThread = threads.find((t) => t.id === selectedThreadId);
 
   return (
-    <div className="flex h-screen">
-      <Sidebar
-        currentUser={currentUser}
-        threads={threads}
-        selectedThreadId={selectedThreadId}
-        onSelectThread={setSelectedThreadId}
-        onlineIds={onlineIds}
-        members={allProfiles}
-        onCreateThread={handleCreateThread}
-      />
-      {selectedThread ? (
-        <ChatWindow
-          thread={selectedThread}
-          messages={messages}
+    <div className="flex h-[100dvh] overflow-hidden">
+      <div className={cn("w-full shrink-0 md:block md:w-72", selectedThreadId ? "hidden md:block" : "block")}>
+        <Sidebar
           currentUser={currentUser}
-          onSend={handleSend}
-          onSendAttachment={handleSendAttachment}
-          onMarkRead={handleMarkRead}
+          threads={threads}
+          selectedThreadId={selectedThreadId}
+          onSelectThread={setSelectedThreadId}
+          onlineIds={onlineIds}
+          members={allProfiles}
+          onCreateThread={handleCreateThread}
         />
-      ) : (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-          <span className="text-5xl">👋</span>
-          <p className="font-heading text-xl text-foreground">
-            Start a new chat to get going!
-          </p>
-        </div>
-      )}
+      </div>
+      <div className={cn("min-w-0 flex-1", selectedThreadId ? "block" : "hidden md:block")}>
+        {selectedThread ? (
+          <ChatWindow
+            thread={selectedThread}
+            messages={messages}
+            currentUser={currentUser}
+            onSend={handleSend}
+            onSendAttachment={handleSendAttachment}
+            onMarkRead={handleMarkRead}
+            onBack={() => setSelectedThreadId(null)}
+            onSetTheme={handleSetTheme}
+            onSetBackgroundPhoto={handleSetBackgroundPhoto}
+          />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+            <span className="text-5xl">👋</span>
+            <p className="font-heading text-xl text-foreground">
+              Start a new chat to get going!
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

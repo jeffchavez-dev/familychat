@@ -27,7 +27,7 @@ export function Sidebar({
   onCreateThread: (otherUserIds: string[], name: string | null) => Promise<void>;
 }) {
   return (
-    <aside className="flex w-72 shrink-0 flex-col bg-sidebar text-sidebar-foreground">
+    <aside className="flex h-full w-full shrink-0 flex-col bg-sidebar text-sidebar-foreground md:w-72">
       <div className="flex items-center justify-between p-3">
         <div className="flex items-center gap-2">
           <FunAvatar id={currentUser.id} size="sm" />
