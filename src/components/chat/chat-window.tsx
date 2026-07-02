@@ -26,6 +26,7 @@ export function ChatWindow({
   onSetBackgroundPhoto,
   onSetGroupAvatarKey,
   onSetGroupAvatarPhoto,
+  onStartBuzzer,
 }: {
   thread: Thread;
   messages: Message[];
@@ -39,6 +40,7 @@ export function ChatWindow({
   onSetBackgroundPhoto: (file: File) => Promise<void>;
   onSetGroupAvatarKey: (key: string) => Promise<void>;
   onSetGroupAvatarPhoto: (file: File) => Promise<void>;
+  onStartBuzzer: () => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const backgroundPhotoUrl = useSignedUrl(thread.background_url);
@@ -105,15 +107,27 @@ export function ChatWindow({
         ) : (
           <FunAvatar id={headerAvatarId} avatarKey={headerAvatarKey} avatarUrl={headerAvatarUrl} size="sm" />
         )}
-        <h2 className="font-heading text-lg text-foreground">
+        <h2 className="truncate font-heading text-lg text-foreground">
           {threadTitle(thread, currentUser.id)}
         </h2>
-        <ThemeDialog
-          currentTheme={thread.theme}
-          hasBackgroundPhoto={!!thread.background_url}
-          onSetTheme={onSetTheme}
-          onSetBackgroundPhoto={onSetBackgroundPhoto}
-        />
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="rounded-full text-lg"
+            onClick={onStartBuzzer}
+            aria-label="Start buzzer game"
+          >
+            🎮
+          </Button>
+          <ThemeDialog
+            currentTheme={thread.theme}
+            hasBackgroundPhoto={!!thread.background_url}
+            onSetTheme={onSetTheme}
+            onSetBackgroundPhoto={onSetBackgroundPhoto}
+          />
+        </div>
       </div>
       <div className="relative flex-1 overflow-hidden" style={backgroundStyle}>
         {thread.background_url && <div className="absolute inset-0 bg-background/45" />}

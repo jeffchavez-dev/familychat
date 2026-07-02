@@ -65,7 +65,7 @@ export function ThemeDialog({
             type="button"
             variant="ghost"
             size="icon"
-            className="ml-auto rounded-full text-lg"
+            className="rounded-full text-lg"
             aria-label="Customize chat"
           >
             🎨
