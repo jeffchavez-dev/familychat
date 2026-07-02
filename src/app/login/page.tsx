@@ -48,7 +48,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-4 flex justify-center">
           <span className="flex h-20 w-20 items-center justify-center rounded-full bg-primary text-4xl shadow-lg shadow-primary/30">
-            🎈
+            <img src="/logo.png" alt="Family Chat Logo" className="h-full w-full object-contain" />
           </span>
         </div>
         <Card className="border-2 border-border/60 shadow-xl shadow-primary/10">
