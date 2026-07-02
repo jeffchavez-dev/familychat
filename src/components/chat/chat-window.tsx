@@ -27,6 +27,7 @@ export function ChatWindow({
   onSetGroupAvatarKey,
   onSetGroupAvatarPhoto,
   onStartBuzzer,
+  onStartUno,
 }: {
   thread: Thread;
   messages: Message[];
@@ -41,6 +42,7 @@ export function ChatWindow({
   onSetGroupAvatarKey: (key: string) => Promise<void>;
   onSetGroupAvatarPhoto: (file: File) => Promise<void>;
   onStartBuzzer: () => void;
+  onStartUno: () => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const backgroundPhotoUrl = useSignedUrl(thread.background_url);
@@ -120,6 +122,16 @@ export function ChatWindow({
             aria-label="Start buzzer game"
           >
             🎮
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="rounded-full text-lg"
+            onClick={onStartUno}
+            aria-label="Start Uno game"
+          >
+            🃏
           </Button>
           <ThemeDialog
             currentTheme={thread.theme}

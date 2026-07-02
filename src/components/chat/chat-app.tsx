@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { usePresence } from "@/lib/supabase/use-presence";
 import { cn } from "@/lib/utils";
 import {
+  createFamilyMember,
   createThread,
   fetchMessages,
   fetchThreads,
@@ -30,6 +31,18 @@ import {
   type BuzzerScore,
   type BuzzerWinner,
 } from "@/components/chat/buzzer-overlay";
+import { UnoLobby, UnoOverlay } from "@/components/chat/uno-overlay";
+import {
+  applyDrawCard,
+  applyPlayCard,
+  dealRound,
+  type CardColor,
+  type UnoPlayer,
+  type UnoRoundSeed,
+  type UnoRoundState,
+  type UnoScore,
+  type UnoWinner,
+} from "@/lib/uno-game";
 import { AVATAR_PALETTE } from "@/lib/avatar-style";
 import { isEmojiOnly } from "@/lib/emoji";
 import type { Message, Profile, Thread } from "@/lib/types";
@@ -55,11 +68,22 @@ export function ChatApp({
   const [buzzerWinner, setBuzzerWinner] = useState<BuzzerWinner | null>(null);
   const [buzzerScores, setBuzzerScores] = useState<Record<string, BuzzerScore>>({});
   const [hasBuzzed, setHasBuzzed] = useState(false);
+  const [unoLobbyOpen, setUnoLobbyOpen] = useState(false);
+  const [unoRound, setUnoRound] = useState<UnoRoundState | null>(null);
+  const [unoWinner, setUnoWinner] = useState<UnoWinner | null>(null);
+  const [unoScores, setUnoScores] = useState<Record<string, UnoScore>>({});
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
   const channelReadyRef = useRef(false);
+  // Mirrors unoRound outside React state so broadcast handlers can read/write
+  // the latest value synchronously. Needed because the win check derives from
+  // applying a move to prior state (unlike buzzer's self-contained winner
+  // payload) — doing that inside a setState updater would let React's
+  // dev-mode double-invocation of updater functions double-fire the
+  // setUnoScores/setShower side effects nested inside it.
+  const unoRoundRef = useRef<UnoRoundState | null>(null);
   const onlineIds = usePresence(profile.id);
 
-  // Reset the buzzer game when switching threads. Adjusting state directly
+  // Reset any active game when switching threads. Adjusting state directly
   // during render (guarded by comparing against the last-seen thread) is
   // React's recommended pattern for this, instead of an effect.
   const [buzzerThreadId, setBuzzerThreadId] = useState(selectedThreadId);
@@ -70,6 +94,10 @@ export function ChatApp({
     setBuzzerWinner(null);
     setBuzzerScores({});
     setHasBuzzed(false);
+    setUnoLobbyOpen(false);
+    setUnoRound(null);
+    setUnoWinner(null);
+    setUnoScores({});
   }
 
   useEffect(() => {
@@ -107,6 +135,62 @@ export function ChatApp({
         if (winner.roundNumber === winner.totalRounds) {
           setShower({ key: Date.now(), content: "🏆" });
         }
+      })
+      .on("broadcast", { event: "start_uno_lobby" }, () => {
+        setUnoLobbyOpen(true);
+      })
+      .on("broadcast", { event: "start_uno_round" }, (payload) => {
+        const seed = payload.payload as UnoRoundSeed;
+        const dealt = dealRound(seed);
+        unoRoundRef.current = dealt;
+        setUnoRound(dealt);
+        setUnoWinner(null);
+        setUnoLobbyOpen(false);
+        if (seed.roundNumber === 1) setUnoScores({});
+      })
+      .on("broadcast", { event: "play_uno_card" }, (payload) => {
+        const move = payload.payload as {
+          gameId: string;
+          roundId: string;
+          userId: string;
+          cardId: string;
+          chosenColor?: CardColor;
+        };
+        const prev = unoRoundRef.current;
+        if (!prev || prev.roundId !== move.roundId) return;
+        const next = applyPlayCard(prev, move.userId, move.cardId, move.chosenColor);
+        unoRoundRef.current = next;
+        setUnoRound(next);
+        if (next.hands[move.userId].length === 0) {
+          const winnerName = next.players.find((p) => p.userId === move.userId)?.name ?? "";
+          const roundWinner: UnoWinner = {
+            gameId: next.gameId,
+            roundId: next.roundId,
+            roundNumber: next.roundNumber,
+            totalRounds: next.totalRounds,
+            userId: move.userId,
+            userName: winnerName,
+          };
+          setUnoWinner(roundWinner);
+          setUnoScores((prevScores) => ({
+            ...prevScores,
+            [roundWinner.userId]: {
+              name: roundWinner.userName,
+              wins: (prevScores[roundWinner.userId]?.wins ?? 0) + 1,
+            },
+          }));
+          if (roundWinner.roundNumber === roundWinner.totalRounds) {
+            setShower({ key: Date.now(), content: "🏆" });
+          }
+        }
+      })
+      .on("broadcast", { event: "draw_uno_card" }, (payload) => {
+        const move = payload.payload as { gameId: string; roundId: string; userId: string };
+        const prev = unoRoundRef.current;
+        if (!prev || prev.roundId !== move.roundId) return;
+        const next = applyDrawCard(prev, move.userId);
+        unoRoundRef.current = next;
+        setUnoRound(next);
       })
       .on(
         "postgres_changes",
@@ -235,6 +319,10 @@ export function ChatApp({
     },
     [profile.id],
   );
+
+  const handleAddFamilyMember = useCallback(async (name: string, password: string) => {
+    await createFamilyMember(name, password);
+  }, []);
 
   const handleSend = useCallback(
     async (body: string, replyToId: string | null) => {
@@ -404,6 +492,76 @@ export function ChatApp({
     setHasBuzzed(false);
   }, []);
 
+  const handleStartUno = useCallback(() => {
+    setUnoLobbyOpen(true);
+    waitForReadyChannel().then((channel) => {
+      channel?.send({
+        type: "broadcast",
+        event: "start_uno_lobby",
+        payload: { gameId: crypto.randomUUID(), openedBy: profile.id, openedByName: profile.full_name },
+      });
+    });
+  }, [profile.id, profile.full_name, waitForReadyChannel]);
+
+  const handleStartUnoGame = useCallback(
+    async (selectedPlayerIds: string[], totalRounds: number) => {
+      const channel = await waitForReadyChannel();
+      if (!channel) return;
+
+      const players: UnoPlayer[] = selectedPlayerIds
+        .map((id) => allProfiles.find((p) => p.id === id))
+        .filter((p): p is Profile => !!p)
+        .map((p) => ({
+          userId: p.id,
+          name: p.full_name,
+          avatarKey: p.avatar_key,
+          avatarUrl: p.avatar_url,
+        }));
+      if (players.length < 2) return;
+
+      const seed: UnoRoundSeed = {
+        gameId: crypto.randomUUID(),
+        roundId: crypto.randomUUID(),
+        roundNumber: 1,
+        totalRounds,
+        players,
+        startedBy: profile.id,
+        startedByName: profile.full_name,
+      };
+      channel.send({ type: "broadcast", event: "start_uno_round", payload: seed });
+    },
+    [allProfiles, profile.id, profile.full_name, waitForReadyChannel],
+  );
+
+  const handlePlayUnoCard = useCallback(
+    (cardId: string, chosenColor?: CardColor) => {
+      if (!channelRef.current || !unoRound || unoRound.currentPlayerId !== profile.id) return;
+      channelRef.current.send({
+        type: "broadcast",
+        event: "play_uno_card",
+        payload: { gameId: unoRound.gameId, roundId: unoRound.roundId, userId: profile.id, cardId, chosenColor },
+      });
+    },
+    [unoRound, profile.id],
+  );
+
+  const handleDrawUnoCard = useCallback(() => {
+    if (!channelRef.current || !unoRound || unoRound.currentPlayerId !== profile.id) return;
+    channelRef.current.send({
+      type: "broadcast",
+      event: "draw_uno_card",
+      payload: { gameId: unoRound.gameId, roundId: unoRound.roundId, userId: profile.id },
+    });
+  }, [unoRound, profile.id]);
+
+  const handleCloseUno = useCallback(() => {
+    setUnoLobbyOpen(false);
+    setUnoRound(null);
+    unoRoundRef.current = null;
+    setUnoWinner(null);
+    setUnoScores({});
+  }, []);
+
   // Once a round has a winner, the player who started the game (and only
   // that player, so every device doesn't race to broadcast the same round)
   // advances to the next round after a short pause.
@@ -431,6 +589,31 @@ export function ChatApp({
     return () => clearTimeout(timer);
   }, [buzzerWinner, buzzerRound, profile.id]);
 
+  // Same pattern as the buzzer's round auto-advance: only the player who
+  // started the game broadcasts the next round, so devices don't race.
+  useEffect(() => {
+    if (!unoWinner || !unoRound) return;
+    if (unoRound.startedBy !== profile.id) return;
+    if (unoRound.roundNumber >= unoRound.totalRounds) return;
+
+    const timer = setTimeout(() => {
+      const channel = channelRef.current;
+      if (!channel || !channelReadyRef.current) return;
+      const nextSeed: UnoRoundSeed = {
+        gameId: unoRound.gameId,
+        roundId: crypto.randomUUID(),
+        roundNumber: unoRound.roundNumber + 1,
+        totalRounds: unoRound.totalRounds,
+        players: unoRound.players,
+        startedBy: unoRound.startedBy,
+        startedByName: unoRound.startedByName,
+      };
+      channel.send({ type: "broadcast", event: "start_uno_round", payload: nextSeed });
+    }, ROUND_TRANSITION_MS);
+
+    return () => clearTimeout(timer);
+  }, [unoWinner, unoRound, profile.id]);
+
   const selectedThread = threads.find((t) => t.id === selectedThreadId);
 
   return (
@@ -457,6 +640,26 @@ export function ChatApp({
           onClose={handleCloseBuzzer}
         />
       )}
+      {unoLobbyOpen && (
+        <UnoLobby
+          threadParticipants={selectedThread?.participants ?? []}
+          onlineIds={onlineIds}
+          currentUserId={profile.id}
+          onStartGame={handleStartUnoGame}
+          onClose={handleCloseUno}
+        />
+      )}
+      {unoRound && (
+        <UnoOverlay
+          round={unoRound}
+          winner={unoWinner}
+          scores={unoScores}
+          currentUserId={profile.id}
+          onPlayCard={handlePlayUnoCard}
+          onDrawCard={handleDrawUnoCard}
+          onClose={handleCloseUno}
+        />
+      )}
       <div className={cn("w-full shrink-0 md:block md:w-72", selectedThreadId ? "hidden md:block" : "block")}>
         <Sidebar
           currentUser={profile}
@@ -469,6 +672,7 @@ export function ChatApp({
           onSetAvatarKey={handleSetAvatarKey}
           onSetAvatarPhoto={handleSetAvatarPhoto}
           onChangePassword={handleChangePassword}
+          onAddFamilyMember={handleAddFamilyMember}
         />
       </div>
       <div className={cn("min-w-0 flex-1", selectedThreadId ? "block" : "hidden md:block")}>
@@ -488,6 +692,7 @@ export function ChatApp({
             onSetGroupAvatarKey={handleSetGroupAvatarKey}
             onSetGroupAvatarPhoto={handleSetGroupAvatarPhoto}
             onStartBuzzer={handleStartBuzzer}
+            onStartUno={handleStartUno}
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">

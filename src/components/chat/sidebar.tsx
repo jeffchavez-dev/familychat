@@ -2,6 +2,7 @@
 
 import { Separator } from "@/components/ui/separator";
 import { NewThreadDialog } from "@/components/chat/new-thread-dialog";
+import { AddFamilyMemberDialog } from "@/components/chat/add-family-member-dialog";
 import { LogoutButton } from "@/components/chat/logout-button";
 import { EnablePushButton } from "@/components/chat/enable-push-button";
 import { FunAvatar } from "@/components/chat/fun-avatar";
@@ -21,6 +22,7 @@ export function Sidebar({
   onSetAvatarKey,
   onSetAvatarPhoto,
   onChangePassword,
+  onAddFamilyMember,
 }: {
   currentUser: Profile;
   threads: Thread[];
@@ -32,6 +34,7 @@ export function Sidebar({
   onSetAvatarKey: (key: string) => Promise<void>;
   onSetAvatarPhoto: (file: File) => Promise<void>;
   onChangePassword: (password: string) => Promise<void>;
+  onAddFamilyMember: (name: string, password: string) => Promise<void>;
 }) {
   return (
     <aside className="flex h-full w-full shrink-0 flex-col bg-sidebar text-sidebar-foreground md:w-72">
@@ -61,6 +64,7 @@ export function Sidebar({
           members={members.filter((m) => m.id !== currentUser.id)}
           onCreate={onCreateThread}
         />
+        <AddFamilyMemberDialog onCreate={onAddFamilyMember} />
         <EnablePushButton userId={currentUser.id} />
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto px-2 pb-3">

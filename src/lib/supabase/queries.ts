@@ -272,3 +272,15 @@ export async function updatePassword(newPassword: string) {
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) throw error;
 }
+
+export async function createFamilyMember(name: string, password: string): Promise<void> {
+  const res = await fetch("/api/family-members", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, password }),
+  });
+  if (!res.ok) {
+    const { error } = await res.json();
+    throw new Error(error ?? "Couldn't add family member.");
+  }
+}
