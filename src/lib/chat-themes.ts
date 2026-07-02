@@ -1,13 +1,17 @@
 import {
   balloon,
+  bubble,
   cloud,
   dot,
   fish,
   flower,
   heart,
+  monster,
   moon,
   mushroom,
+  paw,
   planet,
+  slimeBlob,
   sparkle,
   star,
   sun,
@@ -118,6 +122,37 @@ const RAINBOW_SVG = [
   dot(150, 60, 3, "#FFFFFF", 0.6),
 ].join("");
 
+const MONSTER_SVG = [
+  monster(70, 80, 1.1, "#FF9F45", "round", 0.95),
+  monster(260, 60, 0.9, "#A78BFA", "horned", 0.9),
+  monster(180, 220, 1.2, "#6BCB77", "round", 0.95),
+  monster(320, 260, 0.85, "#5AC8FA", "horned", 0.9),
+  monster(40, 300, 0.8, "#FF8FB1", "round", 0.85),
+  paw(140, 130, 1, "#FFFFFF", 0.5),
+  paw(300, 140, 0.8, "#FFFFFF", 0.45),
+  paw(90, 250, 0.8, "#FFFFFF", 0.45),
+  star(230, 150, 8, "#FFE27A", 0.8),
+  star(20, 150, 6, "#FFFFFF", 0.7),
+  sparkle(150, 300, 7, "#FFFFFF", 0.75),
+  sparkle(330, 60, 6, "#FFE27A", 0.7),
+  dot(200, 40, 3, "#FFFFFF", 0.6),
+].join("");
+
+const SLIME_SVG = [
+  slimeBlob(70, 70, 1.4, "#6BE585", 0.95),
+  slimeBlob(260, 60, 1.1, "#5AC8FA", 0.9),
+  slimeBlob(160, 220, 1.5, "#A78BFA", 0.95),
+  slimeBlob(320, 260, 1.1, "#FF8FB1", 0.9),
+  slimeBlob(40, 290, 1.2, "#6BE585", 0.9),
+  bubble(140, 140, 8, "#FFFFFF", 0.6),
+  bubble(280, 160, 6, "#FFFFFF", 0.55),
+  bubble(100, 240, 5, "#FFFFFF", 0.55),
+  bubble(230, 320, 7, "#FFFFFF", 0.6),
+  dot(200, 50, 3, "#FFFFFF", 0.5),
+  dot(330, 330, 4, "#FFFFFF", 0.5),
+  dot(20, 180, 3, "#FFFFFF", 0.5),
+].join("");
+
 export const CHAT_THEMES: ChatTheme[] = [
   {
     key: "sunset",
@@ -166,6 +201,22 @@ export const CHAT_THEMES: ChatTheme[] = [
     gradient:
       "linear-gradient(135deg, #FF6B6B 0%, #FFD93D 25%, #6BCB77 50%, #5AC8FA 75%, #A78BFA 100%)",
     pattern: toDataUri(RAINBOW_SVG, TILE),
+    patternSize: TILE,
+  },
+  {
+    key: "monsters",
+    label: "Monster Squad",
+    emoji: "👾",
+    gradient: "linear-gradient(160deg, #FFE27A 0%, #6BCB77 55%, #5AC8FA 100%)",
+    pattern: toDataUri(MONSTER_SVG, TILE),
+    patternSize: TILE,
+  },
+  {
+    key: "slime",
+    label: "Slime Time",
+    emoji: "🟢",
+    gradient: "linear-gradient(160deg, #DFF5D8 0%, #6BE585 55%, #34A853 100%)",
+    pattern: toDataUri(SLIME_SVG, TILE),
     patternSize: TILE,
   },
 ];

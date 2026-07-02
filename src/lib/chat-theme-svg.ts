@@ -120,3 +120,59 @@ export function sparkle(cx: number, cy: number, r: number, color: string, opacit
     <line x1="${cx}" y1="${cy - r}" x2="${cx}" y2="${cy + r}"/>
   </g>`;
 }
+
+// Original critter design (not based on any existing character) for the
+// "Monster Squad" theme: round body, ear nubs, big friendly eyes.
+export function monster(
+  cx: number,
+  cy: number,
+  scale: number,
+  bodyColor: string,
+  variant: "round" | "horned" = "round",
+  opacity = 1,
+) {
+  const u = scale;
+  const ears =
+    variant === "horned"
+      ? `<polygon points="${cx - 9 * u},${cy - 8 * u} ${cx - 13 * u},${cy - 20 * u} ${cx - 4 * u},${cy - 10 * u}" fill="${bodyColor}"/>
+         <polygon points="${cx + 9 * u},${cy - 8 * u} ${cx + 13 * u},${cy - 20 * u} ${cx + 4 * u},${cy - 10 * u}" fill="${bodyColor}"/>`
+      : `<circle cx="${cx - 10 * u}" cy="${cy - 9 * u}" r="${5 * u}" fill="${bodyColor}"/>
+         <circle cx="${cx + 10 * u}" cy="${cy - 9 * u}" r="${5 * u}" fill="${bodyColor}"/>`;
+  return `<g opacity="${opacity}">
+    ${ears}
+    <ellipse cx="${cx}" cy="${cy}" rx="${13 * u}" ry="${11 * u}" fill="${bodyColor}"/>
+    <circle cx="${cx - 5 * u}" cy="${cy - 2 * u}" r="${3.4 * u}" fill="white"/>
+    <circle cx="${cx + 5 * u}" cy="${cy - 2 * u}" r="${3.4 * u}" fill="white"/>
+    <circle cx="${cx - 5 * u}" cy="${cy - 2 * u}" r="${1.6 * u}" fill="#2b2b2b"/>
+    <circle cx="${cx + 5 * u}" cy="${cy - 2 * u}" r="${1.6 * u}" fill="#2b2b2b"/>
+    <path d="M${cx - 4 * u},${cy + 5 * u} Q${cx},${cy + 8 * u} ${cx + 4 * u},${cy + 5 * u}" fill="none" stroke="#2b2b2b" stroke-width="${1.2 * u}" stroke-linecap="round"/>
+  </g>`;
+}
+
+export function paw(cx: number, cy: number, scale: number, color: string, opacity = 1) {
+  const u = scale;
+  return `<g opacity="${opacity}" fill="${color}">
+    <ellipse cx="${cx}" cy="${cy}" rx="${6 * u}" ry="${5 * u}"/>
+    <circle cx="${cx - 6 * u}" cy="${cy - 5 * u}" r="${2.2 * u}"/>
+    <circle cx="${cx - 2 * u}" cy="${cy - 8 * u}" r="${2.2 * u}"/>
+    <circle cx="${cx + 2 * u}" cy="${cy - 8 * u}" r="${2.2 * u}"/>
+    <circle cx="${cx + 6 * u}" cy="${cy - 5 * u}" r="${2.2 * u}"/>
+  </g>`;
+}
+
+// Gooey slime puddle with drips and a glossy highlight, for the "Slime Time" theme.
+export function slimeBlob(cx: number, cy: number, scale: number, color: string, opacity = 1) {
+  const u = scale;
+  return `<g opacity="${opacity}">
+    <path d="M${cx - 16 * u},${cy} q${-2 * u},${10 * u} ${8 * u},${12 * u} q${10 * u},${3 * u} ${18 * u},${-3 * u} q${8 * u},${-5 * u} ${4 * u},${-14 * u} q${-3 * u},${-8 * u} ${-13 * u},${-8 * u} q${-12 * u},${-1 * u} ${-17 * u},${13 * u} z" fill="${color}"/>
+    <path d="M${cx - 6 * u},${cy + 11 * u} q${-1 * u},${8 * u} ${2 * u},${11 * u} q${3 * u},${2 * u} ${4 * u},${-2 * u} q${1 * u},${-6 * u} ${-2 * u},${-10 * u} z" fill="${color}"/>
+    <ellipse cx="${cx - 5 * u}" cy="${cy - 5 * u}" rx="${4 * u}" ry="${2.4 * u}" fill="white" opacity="0.55"/>
+  </g>`;
+}
+
+export function bubble(cx: number, cy: number, r: number, color: string, opacity = 1) {
+  return `<g opacity="${opacity}">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${Math.max(1, r * 0.15)}"/>
+    <circle cx="${cx - r * 0.35}" cy="${cy - r * 0.35}" r="${r * 0.2}" fill="${color}" opacity="0.6"/>
+  </g>`;
+}
