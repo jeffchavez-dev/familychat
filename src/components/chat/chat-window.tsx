@@ -53,7 +53,11 @@ export function ChatWindow({
   const other = thread.participants.find((p) => p.id !== currentUser.id);
 
   const backgroundStyle: React.CSSProperties = theme
-    ? { background: theme.gradient }
+    ? {
+        backgroundImage: `${theme.pattern}, ${theme.gradient}`,
+        backgroundRepeat: "repeat, no-repeat",
+        backgroundSize: `${theme.patternSize}px ${theme.patternSize}px, cover`,
+      }
     : backgroundPhotoUrl
       ? {
           backgroundImage: `url(${backgroundPhotoUrl})`,

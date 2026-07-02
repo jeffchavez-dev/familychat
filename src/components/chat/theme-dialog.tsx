@@ -107,7 +107,11 @@ export function ThemeDialog({
               >
                 <span
                   className="flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-inner"
-                  style={{ background: theme.gradient }}
+                  style={{
+                    backgroundImage: `${theme.pattern}, ${theme.gradient}`,
+                    backgroundRepeat: "repeat, no-repeat",
+                    backgroundSize: `${theme.patternSize / 4}px ${theme.patternSize / 4}px, cover`,
+                  }}
                 >
                   {theme.emoji}
                 </span>
