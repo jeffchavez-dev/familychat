@@ -12,6 +12,8 @@ import {
   sendMessage,
   setProfileAvatarKey,
   setProfileAvatarPhoto,
+  setThreadAvatarKey,
+  setThreadAvatarPhoto,
   setThreadBackgroundPhoto,
   setThreadTheme,
   toggleReaction,
@@ -139,12 +141,18 @@ export function ChatApp({
           filter: `id=eq.${selectedThreadId}`,
         },
         (payload) => {
-          const { theme, background_url } = payload.new as {
+          const { theme, background_url, avatar_key, avatar_url } = payload.new as {
             theme: string | null;
             background_url: string | null;
+            avatar_key: string | null;
+            avatar_url: string | null;
           };
           setThreads((prev) =>
-            prev.map((t) => (t.id === selectedThreadId ? { ...t, theme, background_url } : t)),
+            prev.map((t) =>
+              t.id === selectedThreadId
+                ? { ...t, theme, background_url, avatar_key, avatar_url }
+                : t,
+            ),
           );
         },
       )
@@ -248,6 +256,32 @@ export function ChatApp({
     [selectedThreadId],
   );
 
+  const handleSetGroupAvatarKey = useCallback(
+    async (key: string) => {
+      if (!selectedThreadId) return;
+      await setThreadAvatarKey(selectedThreadId, key);
+      setThreads((prev) =>
+        prev.map((t) =>
+          t.id === selectedThreadId ? { ...t, avatar_key: key, avatar_url: null } : t,
+        ),
+      );
+    },
+    [selectedThreadId],
+  );
+
+  const handleSetGroupAvatarPhoto = useCallback(
+    async (file: File) => {
+      if (!selectedThreadId) return;
+      const path = await setThreadAvatarPhoto(selectedThreadId, file);
+      setThreads((prev) =>
+        prev.map((t) =>
+          t.id === selectedThreadId ? { ...t, avatar_url: path, avatar_key: null } : t,
+        ),
+      );
+    },
+    [selectedThreadId],
+  );
+
   const selectedThread = threads.find((t) => t.id === selectedThreadId);
 
   return (
@@ -288,6 +322,8 @@ export function ChatApp({
             onBack={() => setSelectedThreadId(null)}
             onSetTheme={handleSetTheme}
             onSetBackgroundPhoto={handleSetBackgroundPhoto}
+            onSetGroupAvatarKey={handleSetGroupAvatarKey}
+            onSetGroupAvatarPhoto={handleSetGroupAvatarPhoto}
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">

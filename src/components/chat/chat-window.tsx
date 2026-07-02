@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { MessageInput } from "@/components/chat/message-input";
 import { FunAvatar } from "@/components/chat/fun-avatar";
+import { GroupPhotoDialog } from "@/components/chat/group-photo-dialog";
 import { ThemeDialog } from "@/components/chat/theme-dialog";
 import { threadTitle } from "@/components/chat/thread-title";
 import { findChatTheme } from "@/lib/chat-themes";
@@ -23,6 +24,8 @@ export function ChatWindow({
   onBack,
   onSetTheme,
   onSetBackgroundPhoto,
+  onSetGroupAvatarKey,
+  onSetGroupAvatarPhoto,
 }: {
   thread: Thread;
   messages: Message[];
@@ -34,6 +37,8 @@ export function ChatWindow({
   onBack: () => void;
   onSetTheme: (theme: string | null) => Promise<void>;
   onSetBackgroundPhoto: (file: File) => Promise<void>;
+  onSetGroupAvatarKey: (key: string) => Promise<void>;
+  onSetGroupAvatarPhoto: (file: File) => Promise<void>;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const backgroundPhotoUrl = useSignedUrl(thread.background_url);
@@ -55,6 +60,9 @@ export function ChatWindow({
   );
   const messagesById = Object.fromEntries(messages.map((m) => [m.id, m]));
   const other = thread.participants.find((p) => p.id !== currentUser.id);
+  const headerAvatarId = thread.is_group ? thread.id : (other?.id ?? thread.id);
+  const headerAvatarKey = thread.is_group ? thread.avatar_key : other?.avatar_key;
+  const headerAvatarUrl = thread.is_group ? thread.avatar_url : other?.avatar_url;
 
   const backgroundStyle: React.CSSProperties = theme
     ? {
@@ -83,12 +91,20 @@ export function ChatWindow({
         >
           ←
         </Button>
-        <FunAvatar
-          id={other?.id ?? thread.id}
-          avatarKey={other?.avatar_key}
-          avatarUrl={other?.avatar_url}
-          size="sm"
-        />
+        {thread.is_group ? (
+          <GroupPhotoDialog
+            thread={thread}
+            onSetAvatarKey={onSetGroupAvatarKey}
+            onSetAvatarPhoto={onSetGroupAvatarPhoto}
+            trigger={
+              <button type="button" className="rounded-full">
+                <FunAvatar id={headerAvatarId} avatarKey={headerAvatarKey} avatarUrl={headerAvatarUrl} size="sm" />
+              </button>
+            }
+          />
+        ) : (
+          <FunAvatar id={headerAvatarId} avatarKey={headerAvatarKey} avatarUrl={headerAvatarUrl} size="sm" />
+        )}
         <h2 className="font-heading text-lg text-foreground">
           {threadTitle(thread, currentUser.id)}
         </h2>

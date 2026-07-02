@@ -79,9 +79,9 @@ export function Sidebar({
             >
               <div className="relative">
                 <FunAvatar
-                  id={other?.id ?? thread.id}
-                  avatarKey={other?.avatar_key}
-                  avatarUrl={other?.avatar_url}
+                  id={thread.is_group ? thread.id : (other?.id ?? thread.id)}
+                  avatarKey={thread.is_group ? thread.avatar_key : other?.avatar_key}
+                  avatarUrl={thread.is_group ? thread.avatar_url : other?.avatar_url}
                   size="sm"
                 />
                 {!thread.is_group && isOnline && (

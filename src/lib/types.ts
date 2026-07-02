@@ -13,6 +13,8 @@ export type Thread = {
   participants: Profile[];
   theme: string | null;
   background_url: string | null;
+  avatar_key: string | null;
+  avatar_url: string | null;
 };
 
 export type Reaction = {

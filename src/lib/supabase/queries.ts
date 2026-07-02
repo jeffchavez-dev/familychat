@@ -8,6 +8,8 @@ type RawThreadRow = {
   created_at: string;
   theme: string | null;
   background_url: string | null;
+  avatar_key: string | null;
+  avatar_url: string | null;
   thread_participants: { profiles: Profile }[] | null;
 };
 
@@ -17,7 +19,7 @@ export async function fetchThreads(): Promise<Thread[]> {
   const { data, error } = await supabase
     .from("threads")
     .select(
-      "id, is_group, name, created_at, theme, background_url, thread_participants(profiles(id, full_name, avatar_url, avatar_key))",
+      "id, is_group, name, created_at, theme, background_url, avatar_key, avatar_url, thread_participants(profiles(id, full_name, avatar_url, avatar_key))",
     )
     .order("created_at", { ascending: false })
     .returns<RawThreadRow[]>();
@@ -31,6 +33,8 @@ export async function fetchThreads(): Promise<Thread[]> {
     created_at: t.created_at,
     theme: t.theme,
     background_url: t.background_url,
+    avatar_key: t.avatar_key,
+    avatar_url: t.avatar_url,
     participants: (t.thread_participants ?? [])
       .map((tp) => tp.profiles)
       .filter(Boolean),
@@ -191,6 +195,34 @@ export async function setThreadBackgroundPhoto(threadId: string, file: File) {
   const { error: updateError } = await supabase
     .from("threads")
     .update({ background_url: path, theme: null })
+    .eq("id", threadId);
+  if (updateError) throw updateError;
+
+  return path;
+}
+
+export async function setThreadAvatarKey(threadId: string, avatarKey: string) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("threads")
+    .update({ avatar_key: avatarKey, avatar_url: null })
+    .eq("id", threadId);
+
+  if (error) throw error;
+}
+
+export async function setThreadAvatarPhoto(threadId: string, file: File) {
+  const supabase = createClient();
+  const path = `group-avatars/${threadId}/${crypto.randomUUID()}-${file.name}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("attachments")
+    .upload(path, file);
+  if (uploadError) throw uploadError;
+
+  const { error: updateError } = await supabase
+    .from("threads")
+    .update({ avatar_url: path, avatar_key: null })
     .eq("id", threadId);
   if (updateError) throw updateError;
 

@@ -19,7 +19,9 @@ create table if not exists threads (
   created_by uuid references profiles (id),
   created_at timestamptz not null default now(),
   theme text,
-  background_url text
+  background_url text,
+  avatar_key text,
+  avatar_url text
 );
 
 create table if not exists thread_participants (
