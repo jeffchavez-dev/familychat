@@ -136,3 +136,20 @@
     @apply font-sans;
   }
 }
+
+@keyframes shower-fall {
+  0% {
+    transform: translateY(-10vh) translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) translateX(var(--shower-drift, 0px)) rotate(var(--shower-rotate, 180deg));
+    opacity: 0;
+  }
+}

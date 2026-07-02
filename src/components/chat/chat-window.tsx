@@ -105,6 +105,7 @@ export function ChatWindow({
                 message={m}
                 isOwn={m.sender_id === currentUser.id}
                 sender={participantsById[m.sender_id]}
+                participants={thread.participants}
                 readByOthers={m.readBy.filter((id) => id !== currentUser.id)}
               />
             ))}
@@ -112,7 +113,11 @@ export function ChatWindow({
           </div>
         </ScrollArea>
       </div>
-      <MessageInput onSend={onSend} onSendAttachment={onSendAttachment} />
+      <MessageInput
+        onSend={onSend}
+        onSendAttachment={onSendAttachment}
+        participants={thread.participants.filter((p) => p.id !== currentUser.id)}
+      />
     </div>
   );
 }

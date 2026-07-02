@@ -1,6 +1,7 @@
 import { Attachment } from "@/components/chat/attachment";
 import { FunAvatar } from "@/components/chat/fun-avatar";
 import { avatarStyle } from "@/lib/avatar-style";
+import { splitMentions } from "@/lib/mentions";
 import { cn } from "@/lib/utils";
 import type { Message, Profile } from "@/lib/types";
 
@@ -8,14 +9,17 @@ export function MessageBubble({
   message,
   isOwn,
   sender,
+  participants,
   readByOthers,
 }: {
   message: Message;
   isOwn: boolean;
   sender: Profile | undefined;
+  participants: Profile[];
   readByOthers: string[];
 }) {
   const senderColor = sender ? avatarStyle(sender.id, sender.avatar_key).bg : "#4ECDC4";
+  const bodySegments = message.body ? splitMentions(message.body, participants) : [];
 
   return (
     <div
@@ -55,7 +59,25 @@ export function MessageBubble({
               <Attachment path={message.attachment_url} type={message.attachment_type} />
             </div>
           )}
-          {message.body && <p className="whitespace-pre-wrap">{message.body}</p>}
+          {message.body && (
+            <p className="whitespace-pre-wrap">
+              {bodySegments.map((segment, i) =>
+                "mention" in segment ? (
+                  <span
+                    key={i}
+                    className={cn(
+                      "rounded-md px-1 font-bold",
+                      isOwn ? "bg-primary-foreground/20" : "bg-primary/15 text-primary",
+                    )}
+                  >
+                    @{segment.mention}
+                  </span>
+                ) : (
+                  <span key={i}>{segment.text}</span>
+                ),
+              )}
+            </p>
+          )}
         </div>
         <span className="mt-1 rounded-full bg-card/85 px-2 py-0.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm">
           {new Date(message.created_at).toLocaleTimeString([], {

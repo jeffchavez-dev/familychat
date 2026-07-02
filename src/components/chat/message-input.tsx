@@ -3,24 +3,39 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { FunAvatar } from "@/components/chat/fun-avatar";
+import { insertMention, mentionQueryAt } from "@/lib/mentions";
+import type { Profile } from "@/lib/types";
 
 const QUICK_EMOJIS = ["😂", "❤️", "👍", "🎉", "😢", "🐶"];
 
 export function MessageInput({
   onSend,
   onSendAttachment,
+  participants,
 }: {
   onSend: (body: string) => Promise<void>;
   onSendAttachment: (file: File) => Promise<void>;
+  participants: Profile[];
 }) {
   const [value, setValue] = useState("");
   const [sending, setSending] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const mentionMatches =
+    mentionQuery !== null
+      ? participants
+          .filter((p) => p.full_name.toLowerCase().includes(mentionQuery.toLowerCase()))
+          .slice(0, 5)
+      : [];
 
   async function send(body: string) {
     if (!body || sending) return;
     setSending(true);
     setValue("");
+    setMentionQuery(null);
     await onSend(body);
     setSending(false);
   }
@@ -32,6 +47,24 @@ export function MessageInput({
     setSending(true);
     await onSendAttachment(file);
     setSending(false);
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const newValue = e.target.value;
+    setValue(newValue);
+    const cursor = e.target.selectionStart ?? newValue.length;
+    setMentionQuery(mentionQueryAt(newValue, cursor));
+  }
+
+  function pickMention(name: string) {
+    const cursor = textareaRef.current?.selectionStart ?? value.length;
+    const { value: newValue, cursor: newCursor } = insertMention(value, cursor, name);
+    setValue(newValue);
+    setMentionQuery(null);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(newCursor, newCursor);
+    });
   }
 
   return (
@@ -49,7 +82,22 @@ export function MessageInput({
           </button>
         ))}
       </div>
-      <div className="flex items-end gap-2">
+      <div className="relative flex items-end gap-2">
+        {mentionMatches.length > 0 && (
+          <div className="absolute bottom-full left-0 mb-2 w-56 overflow-hidden rounded-2xl border bg-popover shadow-lg">
+            {mentionMatches.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => pickMention(p.full_name)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold hover:bg-muted"
+              >
+                <FunAvatar id={p.id} avatarKey={p.avatar_key} avatarUrl={p.avatar_url} size="sm" />
+                {p.full_name}
+              </button>
+            ))}
+          </div>
+        )}
         <input
           ref={fileInputRef}
           type="file"
@@ -68,15 +116,18 @@ export function MessageInput({
           📎
         </Button>
         <Textarea
+          ref={textareaRef}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={handleChange}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               send(value.trim());
+            } else if (e.key === "Escape") {
+              setMentionQuery(null);
             }
           }}
-          placeholder="Say something fun..."
+          placeholder="Say something fun... (@ to mention)"
           className="field-sizing-fixed min-h-11 min-w-0 flex-1 resize-none rounded-2xl text-base"
           rows={1}
         />

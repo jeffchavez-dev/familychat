@@ -19,6 +19,8 @@ import {
 } from "@/lib/supabase/queries";
 import { Sidebar } from "@/components/chat/sidebar";
 import { ChatWindow } from "@/components/chat/chat-window";
+import { EmojiShower } from "@/components/chat/emoji-shower";
+import { isEmojiOnly } from "@/lib/emoji";
 import type { Message, Profile, Thread } from "@/lib/types";
 
 export function ChatApp({
@@ -32,6 +34,7 @@ export function ChatApp({
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [shower, setShower] = useState<{ key: number; content: string } | null>(null);
   const onlineIds = usePresence(profile.id);
 
   useEffect(() => {
@@ -59,6 +62,9 @@ export function ChatApp({
         (payload) => {
           const m = payload.new as Omit<Message, "readBy">;
           setMessages((prev) => [...prev, { ...m, readBy: [] }]);
+          if (m.body && isEmojiOnly(m.body)) {
+            setShower({ key: Date.now(), content: m.body });
+          }
         },
       )
       .on(
@@ -197,6 +203,14 @@ export function ChatApp({
 
   return (
     <div className="flex h-[100dvh] overflow-hidden">
+      {shower && (
+        <EmojiShower
+          key={shower.key}
+          content={shower.content}
+          seed={shower.key}
+          onDone={() => setShower(null)}
+        />
+      )}
       <div className={cn("w-full shrink-0 md:block md:w-72", selectedThreadId ? "hidden md:block" : "block")}>
         <Sidebar
           currentUser={profile}
