@@ -34,18 +34,21 @@ export function MessageBubble({
       )}
       <div className={cn("flex max-w-[75%] flex-col", isOwn ? "items-end" : "items-start")}>
         {!isOwn && (
-          <span className="mb-1 px-1 text-xs font-bold text-muted-foreground">
+          <span
+            className="mb-1 rounded-full bg-card/85 px-2 py-0.5 text-xs font-bold text-foreground shadow-sm backdrop-blur-sm"
+            style={{ color: senderColor }}
+          >
             {sender?.full_name ?? "Unknown"}
           </span>
         )}
         <div
           className={cn(
-            "rounded-3xl px-4 py-2.5 text-sm shadow-sm",
+            "rounded-3xl border-l-4 px-4 py-2.5 text-sm text-foreground shadow-md",
             isOwn
-              ? "rounded-br-md bg-primary text-primary-foreground"
-              : "rounded-bl-md text-foreground",
+              ? "rounded-br-md rounded-l-3xl border-l-0 bg-primary text-primary-foreground shadow-primary/20"
+              : "rounded-bl-md bg-card",
           )}
-          style={!isOwn ? { backgroundColor: `${senderColor}26` } : undefined}
+          style={!isOwn ? { borderLeftColor: senderColor } : undefined}
         >
           {message.attachment_url && (
             <div className="mb-1">
@@ -54,7 +57,7 @@ export function MessageBubble({
           )}
           {message.body && <p className="whitespace-pre-wrap">{message.body}</p>}
         </div>
-        <span className="mt-1 px-1 text-[11px] text-muted-foreground">
+        <span className="mt-1 rounded-full bg-card/85 px-2 py-0.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm">
           {new Date(message.created_at).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
