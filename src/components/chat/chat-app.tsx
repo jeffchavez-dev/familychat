@@ -23,10 +23,20 @@ import {
 import { Sidebar } from "@/components/chat/sidebar";
 import { ChatWindow } from "@/components/chat/chat-window";
 import { EmojiShower } from "@/components/chat/emoji-shower";
-import { BuzzerOverlay, type BuzzerRound, type BuzzerWinner } from "@/components/chat/buzzer-overlay";
+import {
+  BuzzerOverlay,
+  BuzzerSetup,
+  type BuzzerRound,
+  type BuzzerScore,
+  type BuzzerWinner,
+} from "@/components/chat/buzzer-overlay";
 import { AVATAR_PALETTE } from "@/lib/avatar-style";
 import { isEmojiOnly } from "@/lib/emoji";
 import type { Message, Profile, Thread } from "@/lib/types";
+
+// Kept short so the game keeps moving — long enough to see who won, short
+// enough that a 5-round game doesn't feel like it's stalling between rounds.
+const ROUND_TRANSITION_MS = 1800;
 
 export function ChatApp({
   currentUser,
@@ -40,8 +50,10 @@ export function ChatApp({
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [shower, setShower] = useState<{ key: number; content: string } | null>(null);
+  const [buzzerSetupOpen, setBuzzerSetupOpen] = useState(false);
   const [buzzerRound, setBuzzerRound] = useState<BuzzerRound | null>(null);
   const [buzzerWinner, setBuzzerWinner] = useState<BuzzerWinner | null>(null);
+  const [buzzerScores, setBuzzerScores] = useState<Record<string, BuzzerScore>>({});
   const [hasBuzzed, setHasBuzzed] = useState(false);
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
   const channelReadyRef = useRef(false);
@@ -53,8 +65,10 @@ export function ChatApp({
   const [buzzerThreadId, setBuzzerThreadId] = useState(selectedThreadId);
   if (selectedThreadId !== buzzerThreadId) {
     setBuzzerThreadId(selectedThreadId);
+    setBuzzerSetupOpen(false);
     setBuzzerRound(null);
     setBuzzerWinner(null);
+    setBuzzerScores({});
     setHasBuzzed(false);
   }
 
@@ -73,18 +87,26 @@ export function ChatApp({
     const channel = supabase
       .channel(`thread-${selectedThreadId}`, { config: { broadcast: { self: true } } })
       .on("broadcast", { event: "start_round" }, (payload) => {
-        setBuzzerRound(payload.payload as BuzzerRound);
+        const round = payload.payload as BuzzerRound;
+        setBuzzerRound(round);
         setBuzzerWinner(null);
+        setBuzzerSetupOpen(false);
         setHasBuzzed(false);
+        if (round.roundNumber === 1) setBuzzerScores({});
       })
       .on("broadcast", { event: "buzz" }, (payload) => {
         const winner = payload.payload as BuzzerWinner;
-        setBuzzerWinner((prev) => {
-          if (prev && prev.roundId === winner.roundId) return prev;
-          const animalEmoji = AVATAR_PALETTE.find((p) => p.key === winner.animalKey)?.emoji;
-          if (animalEmoji) setShower({ key: Date.now(), content: animalEmoji });
-          return winner;
-        });
+        setBuzzerWinner((prev) => (prev && prev.roundId === winner.roundId ? prev : winner));
+        setBuzzerScores((prev) => ({
+          ...prev,
+          [winner.userId]: {
+            name: winner.userName,
+            wins: (prev[winner.userId]?.wins ?? 0) + 1,
+          },
+        }));
+        if (winner.roundNumber === winner.totalRounds) {
+          setShower({ key: Date.now(), content: "🏆" });
+        }
       })
       .on(
         "postgres_changes",
@@ -323,33 +345,50 @@ export function ChatApp({
     [selectedThreadId],
   );
 
-  const handleStartBuzzer = useCallback(async () => {
+  // Waits for the channel to actually finish joining before returning it —
+  // broadcasts sent before that are silently dropped rather than queued.
+  const waitForReadyChannel = useCallback(async () => {
     const channel = channelRef.current;
-    if (!channel) return;
-    // A channel can be non-null but not yet fully joined (e.g. tapping the
-    // button right after opening a chat) — broadcasts sent in that window
-    // are silently dropped rather than queued, so wait briefly for it.
+    if (!channel) return null;
     const deadline = Date.now() + 3000;
     while (!channelReadyRef.current && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    if (!channelReadyRef.current) return;
+    return channelReadyRef.current ? channel : null;
+  }, []);
 
-    const animalKey = AVATAR_PALETTE[Math.floor(Math.random() * AVATAR_PALETTE.length)].key;
-    const round: BuzzerRound = {
-      roundId: crypto.randomUUID(),
-      animalKey,
-      startedBy: profile.id,
-      startedByName: profile.full_name,
-    };
-    channel.send({ type: "broadcast", event: "start_round", payload: round });
-  }, [profile.id, profile.full_name]);
+  const handleStartBuzzer = useCallback(() => {
+    setBuzzerSetupOpen(true);
+  }, []);
+
+  const handleChooseRounds = useCallback(
+    async (totalRounds: number) => {
+      const channel = await waitForReadyChannel();
+      if (!channel) return;
+
+      const animalKey = AVATAR_PALETTE[Math.floor(Math.random() * AVATAR_PALETTE.length)].key;
+      const round: BuzzerRound = {
+        gameId: crypto.randomUUID(),
+        roundId: crypto.randomUUID(),
+        roundNumber: 1,
+        totalRounds,
+        animalKey,
+        startedBy: profile.id,
+        startedByName: profile.full_name,
+      };
+      channel.send({ type: "broadcast", event: "start_round", payload: round });
+    },
+    [profile.id, profile.full_name, waitForReadyChannel],
+  );
 
   const handleBuzz = useCallback(() => {
     if (!channelRef.current || !buzzerRound || hasBuzzed) return;
     setHasBuzzed(true);
     const winner: BuzzerWinner = {
+      gameId: buzzerRound.gameId,
       roundId: buzzerRound.roundId,
+      roundNumber: buzzerRound.roundNumber,
+      totalRounds: buzzerRound.totalRounds,
       userId: profile.id,
       userName: profile.full_name,
       animalKey: buzzerRound.animalKey,
@@ -358,10 +397,39 @@ export function ChatApp({
   }, [buzzerRound, hasBuzzed, profile.id, profile.full_name]);
 
   const handleCloseBuzzer = useCallback(() => {
+    setBuzzerSetupOpen(false);
     setBuzzerRound(null);
     setBuzzerWinner(null);
+    setBuzzerScores({});
     setHasBuzzed(false);
   }, []);
+
+  // Once a round has a winner, the player who started the game (and only
+  // that player, so every device doesn't race to broadcast the same round)
+  // advances to the next round after a short pause.
+  useEffect(() => {
+    if (!buzzerWinner || !buzzerRound) return;
+    if (buzzerRound.startedBy !== profile.id) return;
+    if (buzzerRound.roundNumber >= buzzerRound.totalRounds) return;
+
+    const timer = setTimeout(() => {
+      const channel = channelRef.current;
+      if (!channel || !channelReadyRef.current) return;
+      const animalKey = AVATAR_PALETTE[Math.floor(Math.random() * AVATAR_PALETTE.length)].key;
+      const nextRound: BuzzerRound = {
+        gameId: buzzerRound.gameId,
+        roundId: crypto.randomUUID(),
+        roundNumber: buzzerRound.roundNumber + 1,
+        totalRounds: buzzerRound.totalRounds,
+        animalKey,
+        startedBy: buzzerRound.startedBy,
+        startedByName: buzzerRound.startedByName,
+      };
+      channel.send({ type: "broadcast", event: "start_round", payload: nextRound });
+    }, ROUND_TRANSITION_MS);
+
+    return () => clearTimeout(timer);
+  }, [buzzerWinner, buzzerRound, profile.id]);
 
   const selectedThread = threads.find((t) => t.id === selectedThreadId);
 
@@ -375,10 +443,14 @@ export function ChatApp({
           onDone={() => setShower(null)}
         />
       )}
+      {buzzerSetupOpen && (
+        <BuzzerSetup onChoose={handleChooseRounds} onClose={handleCloseBuzzer} />
+      )}
       {buzzerRound && (
         <BuzzerOverlay
           round={buzzerRound}
           winner={buzzerWinner}
+          scores={buzzerScores}
           currentUserId={profile.id}
           hasBuzzed={hasBuzzed}
           onBuzz={handleBuzz}
