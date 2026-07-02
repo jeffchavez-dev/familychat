@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { usePresence } from "@/lib/supabase/use-presence";
 import { cn } from "@/lib/utils";
 import {
+  addThreadParticipants,
   createFamilyMember,
   createThread,
   fetchMessages,
@@ -323,6 +324,16 @@ export function ChatApp({
   const handleAddFamilyMember = useCallback(async (name: string, password: string) => {
     await createFamilyMember(name, password);
   }, []);
+
+  const handleAddParticipants = useCallback(
+    async (userIds: string[]) => {
+      if (!selectedThreadId) return;
+      await addThreadParticipants(selectedThreadId, userIds);
+      const updated = await fetchThreads();
+      setThreads(updated);
+    },
+    [selectedThreadId],
+  );
 
   const handleSend = useCallback(
     async (body: string, replyToId: string | null) => {
@@ -682,6 +693,7 @@ export function ChatApp({
             thread={selectedThread}
             messages={messages}
             currentUser={profile}
+            allProfiles={allProfiles}
             onSend={handleSend}
             onSendAttachment={handleSendAttachment}
             onMarkRead={handleMarkRead}
@@ -691,6 +703,7 @@ export function ChatApp({
             onSetBackgroundPhoto={handleSetBackgroundPhoto}
             onSetGroupAvatarKey={handleSetGroupAvatarKey}
             onSetGroupAvatarPhoto={handleSetGroupAvatarPhoto}
+            onAddParticipants={handleAddParticipants}
             onStartBuzzer={handleStartBuzzer}
             onStartUno={handleStartUno}
           />

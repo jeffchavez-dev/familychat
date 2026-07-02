@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { MessageInput } from "@/components/chat/message-input";
 import { FunAvatar } from "@/components/chat/fun-avatar";
-import { GroupPhotoDialog } from "@/components/chat/group-photo-dialog";
+import { GroupSettingsDialog } from "@/components/chat/group-settings-dialog";
 import { ThemeDialog } from "@/components/chat/theme-dialog";
 import { threadTitle } from "@/components/chat/thread-title";
 import { findChatTheme } from "@/lib/chat-themes";
@@ -17,6 +17,7 @@ export function ChatWindow({
   thread,
   messages,
   currentUser,
+  allProfiles,
   onSend,
   onSendAttachment,
   onMarkRead,
@@ -26,12 +27,14 @@ export function ChatWindow({
   onSetBackgroundPhoto,
   onSetGroupAvatarKey,
   onSetGroupAvatarPhoto,
+  onAddParticipants,
   onStartBuzzer,
   onStartUno,
 }: {
   thread: Thread;
   messages: Message[];
   currentUser: Profile;
+  allProfiles: Profile[];
   onSend: (body: string, replyToId: string | null) => Promise<void>;
   onSendAttachment: (file: File) => Promise<void>;
   onMarkRead: (messageId: string) => void;
@@ -41,6 +44,7 @@ export function ChatWindow({
   onSetBackgroundPhoto: (file: File) => Promise<void>;
   onSetGroupAvatarKey: (key: string) => Promise<void>;
   onSetGroupAvatarPhoto: (file: File) => Promise<void>;
+  onAddParticipants: (userIds: string[]) => Promise<void>;
   onStartBuzzer: () => void;
   onStartUno: () => void;
 }) {
@@ -96,10 +100,12 @@ export function ChatWindow({
           ←
         </Button>
         {thread.is_group ? (
-          <GroupPhotoDialog
+          <GroupSettingsDialog
             thread={thread}
+            allProfiles={allProfiles}
             onSetAvatarKey={onSetGroupAvatarKey}
             onSetAvatarPhoto={onSetGroupAvatarPhoto}
+            onAddParticipants={onAddParticipants}
             trigger={
               <button type="button" className="rounded-full">
                 <FunAvatar id={headerAvatarId} avatarKey={headerAvatarKey} avatarUrl={headerAvatarUrl} size="sm" />

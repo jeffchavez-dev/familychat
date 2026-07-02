@@ -108,6 +108,14 @@ export async function createThread(
   return threadId;
 }
 
+export async function addThreadParticipants(threadId: string, userIds: string[]): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("thread_participants")
+    .insert(userIds.map((userId) => ({ thread_id: threadId, user_id: userId })));
+  if (error) throw error;
+}
+
 export async function sendMessage(params: {
   threadId: string;
   senderId: string;
