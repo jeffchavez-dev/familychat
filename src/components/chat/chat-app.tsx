@@ -44,6 +44,7 @@ export function ChatApp({
   const [buzzerWinner, setBuzzerWinner] = useState<BuzzerWinner | null>(null);
   const [hasBuzzed, setHasBuzzed] = useState(false);
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
+  const channelReadyRef = useRef(false);
   const onlineIds = usePresence(profile.id);
 
   // Reset the buzzer game when switching threads. Adjusting state directly
@@ -187,11 +188,17 @@ export function ChatApp({
           );
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        // Broadcasts sent before the channel finishes joining are silently
+        // dropped rather than queued — Supabase's own docs gate .send()
+        // calls on this callback for exactly this reason.
+        channelReadyRef.current = status === "SUBSCRIBED";
+      });
 
     channelRef.current = channel;
 
     return () => {
+      channelReadyRef.current = false;
       channelRef.current = null;
       supabase.removeChannel(channel);
     };
@@ -316,8 +323,18 @@ export function ChatApp({
     [selectedThreadId],
   );
 
-  const handleStartBuzzer = useCallback(() => {
-    if (!channelRef.current) return;
+  const handleStartBuzzer = useCallback(async () => {
+    const channel = channelRef.current;
+    if (!channel) return;
+    // A channel can be non-null but not yet fully joined (e.g. tapping the
+    // button right after opening a chat) — broadcasts sent in that window
+    // are silently dropped rather than queued, so wait briefly for it.
+    const deadline = Date.now() + 3000;
+    while (!channelReadyRef.current && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!channelReadyRef.current) return;
+
     const animalKey = AVATAR_PALETTE[Math.floor(Math.random() * AVATAR_PALETTE.length)].key;
     const round: BuzzerRound = {
       roundId: crypto.randomUUID(),
@@ -325,7 +342,7 @@ export function ChatApp({
       startedBy: profile.id,
       startedByName: profile.full_name,
     };
-    channelRef.current.send({ type: "broadcast", event: "start_round", payload: round });
+    channel.send({ type: "broadcast", event: "start_round", payload: round });
   }, [profile.id, profile.full_name]);
 
   const handleBuzz = useCallback(() => {
