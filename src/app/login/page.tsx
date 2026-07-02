@@ -47,7 +47,7 @@ export default function LoginPage() {
     <div className="flex min-h-[100dvh] items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="mb-4 flex justify-center">
-          <span className="flex h-20 w-20 items-center justify-center rounded-full bg-primary text-4xl shadow-lg shadow-primary/30">
+          <span>
             <img src="/logo.png" alt="Family Chat Logo" className="h-full w-full object-contain" />
           </span>
         </div>
