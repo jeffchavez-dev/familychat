@@ -84,14 +84,27 @@ create policy "users can update their own profile"
   on profiles for update
   using (auth.uid() = id);
 
+-- A thread_participants policy that queries thread_participants itself causes
+-- "infinite recursion detected in policy" — each row check re-triggers the
+-- same policy. Route the check through a security-definer function instead,
+-- which (owned by postgres, which has BYPASSRLS in Supabase) reads the table
+-- without re-entering RLS.
+create or replace function is_thread_participant(check_thread_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from thread_participants
+    where thread_id = check_thread_id and user_id = auth.uid()
+  );
+$$;
+
 create policy "participants can view their threads"
   on threads for select
-  using (
-    exists (
-      select 1 from thread_participants tp
-      where tp.thread_id = threads.id and tp.user_id = auth.uid()
-    )
-  );
+  using (is_thread_participant(id));
 
 create policy "signed-in users can create threads"
   on threads for insert
@@ -99,12 +112,7 @@ create policy "signed-in users can create threads"
 
 create policy "participants can view thread membership"
   on thread_participants for select
-  using (
-    exists (
-      select 1 from thread_participants tp
-      where tp.thread_id = thread_participants.thread_id and tp.user_id = auth.uid()
-    )
-  );
+  using (is_thread_participant(thread_id));
 
 create policy "signed-in users can add participants"
   on thread_participants for insert
@@ -112,30 +120,18 @@ create policy "signed-in users can add participants"
 
 create policy "participants can view messages in their threads"
   on messages for select
-  using (
-    exists (
-      select 1 from thread_participants tp
-      where tp.thread_id = messages.thread_id and tp.user_id = auth.uid()
-    )
-  );
+  using (is_thread_participant(thread_id));
 
 create policy "participants can send messages in their threads"
   on messages for insert
-  with check (
-    sender_id = auth.uid()
-    and exists (
-      select 1 from thread_participants tp
-      where tp.thread_id = messages.thread_id and tp.user_id = auth.uid()
-    )
-  );
+  with check (sender_id = auth.uid() and is_thread_participant(thread_id));
 
 create policy "participants can view read receipts in their threads"
   on message_reads for select
   using (
     exists (
       select 1 from messages m
-      join thread_participants tp on tp.thread_id = m.thread_id
-      where m.id = message_reads.message_id and tp.user_id = auth.uid()
+      where m.id = message_reads.message_id and is_thread_participant(m.thread_id)
     )
   );
 
