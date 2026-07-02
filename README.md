@@ -4,7 +4,7 @@ A private, installable chat app for the family. Next.js (App Router) + Tailwind 
 
 ## Features
 
-- Email/password login, no public signup — accounts are created manually for family members
+- Username + password login (no email, no public signup) — just first name and a PIN/password, kid-friendly
 - 1:1 and group chat threads with realtime messages
 - Photo/file sharing via Supabase Storage
 - Read receipts and online presence
@@ -16,9 +16,8 @@ A private, installable chat app for the family. Next.js (App Router) + Tailwind 
 
 1. Create a free project at [supabase.com](https://supabase.com).
 2. In the SQL Editor, run [`supabase/schema.sql`](supabase/schema.sql). This creates the tables, RLS policies, the `attachments` storage bucket, and a trigger that auto-creates a `profiles` row for each new auth user.
-3. In **Authentication > Providers**, make sure Email is enabled and disable public signups if you don't want strangers self-registering (Authentication > Settings > "Allow new users to sign up").
-4. In **Authentication > Users**, manually add one account per family member (email + password). The trigger from step 2 will create their profile automatically.
-5. Copy **Project Settings > API**: `Project URL`, `anon public` key, and `service_role` key (server-only, keep secret).
+3. In **Authentication > Settings**, turn off "Allow new users to sign up" — accounts are only created by you, never by strangers.
+4. Copy **Project Settings > API**: `Project URL`, `anon public` key, and `service_role` key (server-only, keep secret).
 
 ### 2. Environment variables
 
@@ -41,7 +40,24 @@ npx web-push generate-vapid-keys
 
 `NOTIFY_WEBHOOK_SECRET` can be any random string (e.g. `openssl rand -hex 32`).
 
-### 3. Push notification webhook (optional but recommended)
+### 3. Create family accounts
+
+Login only asks for a name, but Supabase Auth needs an email under the hood — the app maps each name to a private synthetic address like `mira@familychat.local` (see `src/lib/username.ts`). To create accounts:
+
+1. Create `scripts/seed-users.local.json` (gitignored, never committed) as a JSON array:
+   ```json
+   [
+     { "name": "Mira", "password": "..." },
+     { "name": "Dad Jeff", "password": "..." }
+   ]
+   ```
+2. Run:
+   ```
+   npm run seed:users
+   ```
+   This creates each account (or updates the password if it already exists) and sets their display name via the `profiles` trigger. Re-run any time to change a password.
+
+### 4. Push notification webhook (optional but recommended)
 
 To send a push notification whenever a message is sent, add a **Database Webhook** in Supabase (Database > Webhooks):
 
@@ -50,20 +66,20 @@ To send a push notification whenever a message is sent, add a **Database Webhook
 - Type: HTTP Request → `POST https://your-deployed-app.vercel.app/api/notify`
 - Headers: `Authorization: Bearer <NOTIFY_WEBHOOK_SECRET>` (same value as the env var)
 
-### 4. Run locally
+### 5. Run locally
 
 ```
 npm install
 npm run dev
 ```
 
-Visit `http://localhost:3000` — you'll be redirected to `/login`. Sign in with one of the accounts you created in Supabase.
+Visit `http://localhost:3000` — you'll be redirected to `/login`. Sign in with the name and password of one of the accounts you seeded.
 
-### 5. Replace the placeholder icons
+### 6. Replace the placeholder icons
 
 `public/icons/icon-192.png` and `icon-512.png` are solid-color placeholders. Swap in real app icons before you install this on your family's phones.
 
-### 6. Deploy
+### 7. Deploy
 
 1. Push this repo to GitHub.
 2. Import it into [Vercel](https://vercel.com/new).

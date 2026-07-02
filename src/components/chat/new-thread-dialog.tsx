@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { FunAvatar } from "@/components/chat/fun-avatar";
 import type { Profile } from "@/lib/types";
 
 export function NewThreadDialog({
@@ -46,22 +47,28 @@ export function NewThreadDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button size="sm" className="w-full">
-            New chat
+          <Button size="sm" className="w-full rounded-full font-bold shadow-sm shadow-primary/20">
+            ✨ New chat
           </Button>
         }
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Start a conversation</DialogTitle>
+          <DialogTitle className="font-heading text-2xl text-primary">
+            Who do you want to chat with?
+          </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="space-y-2">
           {members.map((m) => (
-            <label key={m.id} className="flex items-center gap-2 text-sm">
+            <label
+              key={m.id}
+              className="flex cursor-pointer items-center gap-2.5 rounded-2xl px-2 py-2 text-sm font-semibold hover:bg-muted"
+            >
               <Checkbox
                 checked={selected.includes(m.id)}
                 onCheckedChange={() => toggle(m.id)}
               />
+              <FunAvatar id={m.id} size="sm" />
               {m.full_name}
             </label>
           ))}
@@ -70,12 +77,17 @@ export function NewThreadDialog({
               placeholder="Group name (optional)"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              className="rounded-2xl"
             />
           )}
         </div>
         <DialogFooter>
-          <Button onClick={handleCreate} disabled={selected.length === 0 || loading}>
-            {loading ? "Creating..." : "Create"}
+          <Button
+            onClick={handleCreate}
+            disabled={selected.length === 0 || loading}
+            className="rounded-full font-bold"
+          >
+            {loading ? "Creating..." : "Create 🎊"}
           </Button>
         </DialogFooter>
       </DialogContent>

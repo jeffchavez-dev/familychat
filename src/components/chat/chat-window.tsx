@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { MessageInput } from "@/components/chat/message-input";
+import { FunAvatar } from "@/components/chat/fun-avatar";
 import { threadTitle } from "@/components/chat/thread-title";
 import type { Message, Profile, Thread } from "@/lib/types";
 
@@ -37,11 +38,13 @@ export function ChatWindow({
   const participantsById = Object.fromEntries(
     thread.participants.map((p) => [p.id, p]),
   );
+  const other = thread.participants.find((p) => p.id !== currentUser.id);
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <div className="border-b p-3">
-        <h2 className="text-sm font-semibold">
+      <div className="flex items-center gap-2 border-b bg-card/60 p-3">
+        <FunAvatar id={other?.id ?? thread.id} size="sm" />
+        <h2 className="font-heading text-lg text-foreground">
           {threadTitle(thread, currentUser.id)}
         </h2>
       </div>

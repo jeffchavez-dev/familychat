@@ -15,8 +15,14 @@ export function LogoutButton() {
   }
 
   return (
-    <Button variant="ghost" size="sm" onClick={handleLogout}>
-      Sign out
+    <Button
+      variant="ghost"
+      size="icon"
+      className="rounded-full text-lg"
+      onClick={handleLogout}
+      aria-label="Sign out"
+    >
+      👋
     </Button>
   );
 }

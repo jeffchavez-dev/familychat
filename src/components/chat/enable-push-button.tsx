@@ -19,12 +19,22 @@ export function EnablePushButton({ userId }: { userId: string }) {
   }
 
   if (status === "enabled") {
-    return <p className="px-1 text-xs text-muted-foreground">Notifications on</p>;
+    return (
+      <p className="px-1 text-xs font-semibold text-muted-foreground">
+        🔔 Notifications on
+      </p>
+    );
   }
 
   return (
-    <Button variant="outline" size="sm" className="w-full" onClick={handleClick} disabled={status === "enabling"}>
-      {status === "error" ? "Retry notifications" : "Enable notifications"}
+    <Button
+      variant="outline"
+      size="sm"
+      className="w-full rounded-full font-semibold"
+      onClick={handleClick}
+      disabled={status === "enabling"}
+    >
+      {status === "error" ? "Retry notifications" : "🔔 Enable notifications"}
     </Button>
   );
 }

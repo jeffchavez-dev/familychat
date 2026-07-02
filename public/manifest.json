@@ -4,8 +4,8 @@
   "description": "Private chat for the family",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#4f46e5",
+  "background_color": "#FFF3E0",
+  "theme_color": "#FF6B6B",
   "icons": [
     {
       "src": "/icons/icon-192.png",

@@ -145,8 +145,11 @@ export function ChatApp({
           onMarkRead={handleMarkRead}
         />
       ) : (
-        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-          Start a new chat to get going.
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
+          <span className="text-5xl">👋</span>
+          <p className="font-heading text-xl text-foreground">
+            Start a new chat to get going!
+          </p>
         </div>
       )}
     </div>
