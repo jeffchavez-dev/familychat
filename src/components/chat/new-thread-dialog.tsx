@@ -75,7 +75,7 @@ export function NewThreadDialog({
                 checked={selected.includes(m.id)}
                 onCheckedChange={() => toggle(m.id)}
               />
-              <FunAvatar id={m.id} size="sm" />
+              <FunAvatar id={m.id} avatarKey={m.avatar_key} avatarUrl={m.avatar_url} size="sm" />
               {m.full_name}
             </label>
           ))}

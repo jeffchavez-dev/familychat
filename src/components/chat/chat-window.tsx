@@ -75,7 +75,12 @@ export function ChatWindow({
         >
           ←
         </Button>
-        <FunAvatar id={other?.id ?? thread.id} size="sm" />
+        <FunAvatar
+          id={other?.id ?? thread.id}
+          avatarKey={other?.avatar_key}
+          avatarUrl={other?.avatar_url}
+          size="sm"
+        />
         <h2 className="font-heading text-lg text-foreground">
           {threadTitle(thread, currentUser.id)}
         </h2>

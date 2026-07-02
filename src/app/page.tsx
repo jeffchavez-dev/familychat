@@ -15,13 +15,13 @@ export default async function Home() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, full_name, avatar_url")
+    .select("id, full_name, avatar_url, avatar_key")
     .eq("id", user.id)
     .single();
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, full_name, avatar_url");
+    .select("id, full_name, avatar_url, avatar_key");
 
   if (!profile) {
     redirect("/login");

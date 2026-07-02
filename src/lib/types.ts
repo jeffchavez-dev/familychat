@@ -2,6 +2,7 @@ export type Profile = {
   id: string;
   full_name: string;
   avatar_url: string | null;
+  avatar_key: string | null;
 };
 
 export type Thread = {

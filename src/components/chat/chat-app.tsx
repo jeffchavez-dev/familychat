@@ -10,8 +10,11 @@ import {
   fetchThreads,
   markMessageRead,
   sendMessage,
+  setProfileAvatarKey,
+  setProfileAvatarPhoto,
   setThreadBackgroundPhoto,
   setThreadTheme,
+  updatePassword,
   uploadAttachment,
 } from "@/lib/supabase/queries";
 import { Sidebar } from "@/components/chat/sidebar";
@@ -25,10 +28,11 @@ export function ChatApp({
   currentUser: Profile;
   allProfiles: Profile[];
 }) {
+  const [profile, setProfile] = useState(currentUser);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const onlineIds = usePresence(currentUser.id);
+  const onlineIds = usePresence(profile.id);
 
   useEffect(() => {
     fetchThreads().then((t) => {
@@ -105,20 +109,20 @@ export function ChatApp({
 
   const handleCreateThread = useCallback(
     async (otherUserIds: string[], name: string | null) => {
-      const threadId = await createThread(currentUser.id, otherUserIds, name);
+      const threadId = await createThread(profile.id, otherUserIds, name);
       const updated = await fetchThreads();
       setThreads(updated);
       setSelectedThreadId(threadId);
     },
-    [currentUser.id],
+    [profile.id],
   );
 
   const handleSend = useCallback(
     async (body: string) => {
       if (!selectedThreadId) return;
-      await sendMessage({ threadId: selectedThreadId, senderId: currentUser.id, body });
+      await sendMessage({ threadId: selectedThreadId, senderId: profile.id, body });
     },
-    [selectedThreadId, currentUser.id],
+    [selectedThreadId, profile.id],
   );
 
   const handleSendAttachment = useCallback(
@@ -127,21 +131,41 @@ export function ChatApp({
       const { path, type } = await uploadAttachment(selectedThreadId, file);
       await sendMessage({
         threadId: selectedThreadId,
-        senderId: currentUser.id,
+        senderId: profile.id,
         body: null,
         attachmentUrl: path,
         attachmentType: type,
       });
     },
-    [selectedThreadId, currentUser.id],
+    [selectedThreadId, profile.id],
   );
 
   const handleMarkRead = useCallback(
     (messageId: string) => {
-      markMessageRead(messageId, currentUser.id);
+      markMessageRead(messageId, profile.id);
     },
-    [currentUser.id],
+    [profile.id],
   );
+
+  const handleSetAvatarKey = useCallback(
+    async (key: string) => {
+      await setProfileAvatarKey(profile.id, key);
+      setProfile((prev) => ({ ...prev, avatar_key: key, avatar_url: null }));
+    },
+    [profile.id],
+  );
+
+  const handleSetAvatarPhoto = useCallback(
+    async (file: File) => {
+      const path = await setProfileAvatarPhoto(profile.id, file);
+      setProfile((prev) => ({ ...prev, avatar_url: path, avatar_key: null }));
+    },
+    [profile.id],
+  );
+
+  const handleChangePassword = useCallback(async (password: string) => {
+    await updatePassword(password);
+  }, []);
 
   const handleSetTheme = useCallback(
     async (theme: string | null) => {
@@ -175,13 +199,16 @@ export function ChatApp({
     <div className="flex h-[100dvh] overflow-hidden">
       <div className={cn("w-full shrink-0 md:block md:w-72", selectedThreadId ? "hidden md:block" : "block")}>
         <Sidebar
-          currentUser={currentUser}
+          currentUser={profile}
           threads={threads}
           selectedThreadId={selectedThreadId}
           onSelectThread={setSelectedThreadId}
           onlineIds={onlineIds}
           members={allProfiles}
           onCreateThread={handleCreateThread}
+          onSetAvatarKey={handleSetAvatarKey}
+          onSetAvatarPhoto={handleSetAvatarPhoto}
+          onChangePassword={handleChangePassword}
         />
       </div>
       <div className={cn("min-w-0 flex-1", selectedThreadId ? "block" : "hidden md:block")}>
@@ -189,7 +216,7 @@ export function ChatApp({
           <ChatWindow
             thread={selectedThread}
             messages={messages}
-            currentUser={currentUser}
+            currentUser={profile}
             onSend={handleSend}
             onSendAttachment={handleSendAttachment}
             onMarkRead={handleMarkRead}

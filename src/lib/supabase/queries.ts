@@ -17,7 +17,7 @@ export async function fetchThreads(): Promise<Thread[]> {
   const { data, error } = await supabase
     .from("threads")
     .select(
-      "id, is_group, name, created_at, theme, background_url, thread_participants(profiles(id, full_name, avatar_url))",
+      "id, is_group, name, created_at, theme, background_url, thread_participants(profiles(id, full_name, avatar_url, avatar_key))",
     )
     .order("created_at", { ascending: false })
     .returns<RawThreadRow[]>();
@@ -174,4 +174,38 @@ export async function getSignedAttachmentUrl(path: string) {
 
   if (error) throw error;
   return data.signedUrl;
+}
+
+export async function setProfileAvatarKey(userId: string, avatarKey: string) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ avatar_key: avatarKey, avatar_url: null })
+    .eq("id", userId);
+
+  if (error) throw error;
+}
+
+export async function setProfileAvatarPhoto(userId: string, file: File) {
+  const supabase = createClient();
+  const path = `avatars/${userId}/${crypto.randomUUID()}-${file.name}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("attachments")
+    .upload(path, file);
+  if (uploadError) throw uploadError;
+
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({ avatar_url: path, avatar_key: null })
+    .eq("id", userId);
+  if (updateError) throw updateError;
+
+  return path;
+}
+
+export async function updatePassword(newPassword: string) {
+  const supabase = createClient();
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
 }

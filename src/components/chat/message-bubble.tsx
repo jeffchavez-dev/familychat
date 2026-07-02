@@ -15,7 +15,7 @@ export function MessageBubble({
   sender: Profile | undefined;
   readByOthers: string[];
 }) {
-  const senderColor = sender ? avatarStyle(sender.id).bg : "#4ECDC4";
+  const senderColor = sender ? avatarStyle(sender.id, sender.avatar_key).bg : "#4ECDC4";
 
   return (
     <div
@@ -24,7 +24,14 @@ export function MessageBubble({
         isOwn ? "flex-row-reverse" : "flex-row",
       )}
     >
-      {!isOwn && <FunAvatar id={sender?.id ?? "unknown"} size="sm" />}
+      {!isOwn && (
+        <FunAvatar
+          id={sender?.id ?? "unknown"}
+          avatarKey={sender?.avatar_key}
+          avatarUrl={sender?.avatar_url}
+          size="sm"
+        />
+      )}
       <div className={cn("flex max-w-[75%] flex-col", isOwn ? "items-end" : "items-start")}>
         {!isOwn && (
           <span className="mb-1 px-1 text-xs font-bold text-muted-foreground">
