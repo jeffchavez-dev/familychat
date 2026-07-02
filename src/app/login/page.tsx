@@ -47,9 +47,12 @@ export default function LoginPage() {
     <div className="flex min-h-[100dvh] items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="mb-4 flex justify-center">
-          <span>
-            <img src="/logo.png" alt="Family Chat Logo" className="h-full w-full object-contain" />
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element -- static local asset, no remote loader config needed */}
+          <img
+            src="/logo.png"
+            alt="Family Chat"
+            className="h-28 w-28 rounded-3xl object-cover shadow-lg shadow-primary/20"
+          />
         </div>
         <Card className="border-2 border-border/60 shadow-xl shadow-primary/10">
           <CardHeader className="text-center">
