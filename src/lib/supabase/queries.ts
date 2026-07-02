@@ -68,17 +68,23 @@ export async function createThread(
 ): Promise<string> {
   const supabase = createClient();
   const isGroup = otherUserIds.length > 1;
+  // Generate the id client-side and skip .select() on insert: the "view
+  // threads you participate in" RLS policy can't pass yet here because the
+  // creator isn't added to thread_participants until the next insert below,
+  // so asking Postgres to return the inserted row 403s.
+  const threadId = crypto.randomUUID();
 
-  const { data: thread, error: threadError } = await supabase
-    .from("threads")
-    .insert({ is_group: isGroup, name: isGroup ? name : null, created_by: currentUserId })
-    .select("id")
-    .single();
+  const { error: threadError } = await supabase.from("threads").insert({
+    id: threadId,
+    is_group: isGroup,
+    name: isGroup ? name : null,
+    created_by: currentUserId,
+  });
 
   if (threadError) throw threadError;
 
   const participantRows = [currentUserId, ...otherUserIds].map((user_id) => ({
-    thread_id: thread.id,
+    thread_id: threadId,
     user_id,
   }));
 
@@ -88,7 +94,7 @@ export async function createThread(
 
   if (participantsError) throw participantsError;
 
-  return thread.id;
+  return threadId;
 }
 
 export async function sendMessage(params: {

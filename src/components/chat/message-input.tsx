@@ -77,7 +77,7 @@ export function MessageInput({
             }
           }}
           placeholder="Say something fun..."
-          className="min-h-11 flex-1 resize-none rounded-2xl text-base"
+          className="field-sizing-fixed min-h-11 min-w-0 flex-1 resize-none rounded-2xl text-base"
           rows={1}
         />
         <Button

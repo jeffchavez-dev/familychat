@@ -26,6 +26,7 @@ export function NewThreadDialog({
   const [selected, setSelected] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function toggle(id: string) {
     setSelected((prev) =>
@@ -36,11 +37,17 @@ export function NewThreadDialog({
   async function handleCreate() {
     if (selected.length === 0) return;
     setLoading(true);
-    await onCreate(selected, selected.length > 1 ? name || null : null);
-    setLoading(false);
-    setOpen(false);
-    setSelected([]);
-    setName("");
+    setError(null);
+    try {
+      await onCreate(selected, selected.length > 1 ? name || null : null);
+      setOpen(false);
+      setSelected([]);
+      setName("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't create the chat.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -79,6 +86,11 @@ export function NewThreadDialog({
               onChange={(e) => setName(e.target.value)}
               className="rounded-2xl"
             />
+          )}
+          {error && (
+            <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+              {error}
+            </p>
           )}
         </div>
         <DialogFooter>
