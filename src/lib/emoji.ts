@@ -9,3 +9,5 @@ export function isEmojiOnly(text: string) {
   if (!trimmed || trimmed.length > 16) return false;
   return EMOJI_ONLY_REGEX.test(trimmed);
 }
+
+export const REACTION_EMOJIS = ["❤️", "👍", "😂", "😮", "😢", "🎉"];

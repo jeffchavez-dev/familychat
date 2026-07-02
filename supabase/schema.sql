@@ -36,6 +36,7 @@ create table if not exists messages (
   body text,
   attachment_url text,
   attachment_type text,
+  reply_to_id uuid references messages (id) on delete set null,
   created_at timestamptz not null default now()
 );
 
@@ -44,6 +45,14 @@ create table if not exists message_reads (
   user_id uuid not null references profiles (id) on delete cascade,
   read_at timestamptz not null default now(),
   primary key (message_id, user_id)
+);
+
+create table if not exists message_reactions (
+  message_id uuid not null references messages (id) on delete cascade,
+  user_id uuid not null references profiles (id) on delete cascade,
+  emoji text not null,
+  created_at timestamptz not null default now(),
+  primary key (message_id, user_id, emoji)
 );
 
 create table if not exists push_subscriptions (
@@ -77,6 +86,7 @@ alter table threads enable row level security;
 alter table thread_participants enable row level security;
 alter table messages enable row level security;
 alter table message_reads enable row level security;
+alter table message_reactions enable row level security;
 alter table push_subscriptions enable row level security;
 
 create policy "profiles are viewable by any signed-in family member"
@@ -147,6 +157,29 @@ create policy "users can mark messages read for themselves"
   on message_reads for insert
   with check (user_id = auth.uid());
 
+create policy "participants can view reactions in their threads"
+  on message_reactions for select
+  using (
+    exists (
+      select 1 from messages m
+      where m.id = message_reactions.message_id and is_thread_participant(m.thread_id)
+    )
+  );
+
+create policy "participants can add their own reactions"
+  on message_reactions for insert
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from messages m
+      where m.id = message_reactions.message_id and is_thread_participant(m.thread_id)
+    )
+  );
+
+create policy "users can remove their own reactions"
+  on message_reactions for delete
+  using (user_id = auth.uid());
+
 create policy "users manage their own push subscriptions"
   on push_subscriptions for all
   using (user_id = auth.uid())
@@ -156,6 +189,7 @@ create policy "users manage their own push subscriptions"
 alter publication supabase_realtime add table messages;
 alter publication supabase_realtime add table message_reads;
 alter publication supabase_realtime add table threads;
+alter publication supabase_realtime add table message_reactions;
 
 -- Storage bucket for chat attachments (photos/files)
 insert into storage.buckets (id, name, public)

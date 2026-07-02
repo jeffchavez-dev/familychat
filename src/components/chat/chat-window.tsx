@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageBubble } from "@/components/chat/message-bubble";
@@ -19,6 +19,7 @@ export function ChatWindow({
   onSend,
   onSendAttachment,
   onMarkRead,
+  onReact,
   onBack,
   onSetTheme,
   onSetBackgroundPhoto,
@@ -26,9 +27,10 @@ export function ChatWindow({
   thread: Thread;
   messages: Message[];
   currentUser: Profile;
-  onSend: (body: string) => Promise<void>;
+  onSend: (body: string, replyToId: string | null) => Promise<void>;
   onSendAttachment: (file: File) => Promise<void>;
   onMarkRead: (messageId: string) => void;
+  onReact: (messageId: string, emoji: string) => void;
   onBack: () => void;
   onSetTheme: (theme: string | null) => Promise<void>;
   onSetBackgroundPhoto: (file: File) => Promise<void>;
@@ -36,6 +38,7 @@ export function ChatWindow({
   const bottomRef = useRef<HTMLDivElement>(null);
   const backgroundPhotoUrl = useSignedUrl(thread.background_url);
   const theme = findChatTheme(thread.theme);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -50,6 +53,7 @@ export function ChatWindow({
   const participantsById = Object.fromEntries(
     thread.participants.map((p) => [p.id, p]),
   );
+  const messagesById = Object.fromEntries(messages.map((m) => [m.id, m]));
   const other = thread.participants.find((p) => p.id !== currentUser.id);
 
   const backgroundStyle: React.CSSProperties = theme
@@ -99,16 +103,26 @@ export function ChatWindow({
         {thread.background_url && <div className="absolute inset-0 bg-background/45" />}
         <ScrollArea className="relative h-full p-4">
           <div className="flex flex-col gap-3">
-            {messages.map((m) => (
-              <MessageBubble
-                key={m.id}
-                message={m}
-                isOwn={m.sender_id === currentUser.id}
-                sender={participantsById[m.sender_id]}
-                participants={thread.participants}
-                readByOthers={m.readBy.filter((id) => id !== currentUser.id)}
-              />
-            ))}
+            {messages.map((m) => {
+              const repliedToMessage = m.reply_to_id ? messagesById[m.reply_to_id] : undefined;
+              return (
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  isOwn={m.sender_id === currentUser.id}
+                  sender={participantsById[m.sender_id]}
+                  participants={thread.participants}
+                  readByOthers={m.readBy.filter((id) => id !== currentUser.id)}
+                  currentUserId={currentUser.id}
+                  repliedToMessage={repliedToMessage}
+                  repliedToSender={
+                    repliedToMessage ? participantsById[repliedToMessage.sender_id] : undefined
+                  }
+                  onReact={(emoji) => onReact(m.id, emoji)}
+                  onReply={() => setReplyingTo(m)}
+                />
+              );
+            })}
             <div ref={bottomRef} />
           </div>
         </ScrollArea>
@@ -117,6 +131,9 @@ export function ChatWindow({
         onSend={onSend}
         onSendAttachment={onSendAttachment}
         participants={thread.participants.filter((p) => p.id !== currentUser.id)}
+        replyingTo={replyingTo}
+        replyingToSender={replyingTo ? participantsById[replyingTo.sender_id] : undefined}
+        onCancelReply={() => setReplyingTo(null)}
       />
     </div>
   );

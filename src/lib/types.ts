@@ -15,6 +15,11 @@ export type Thread = {
   background_url: string | null;
 };
 
+export type Reaction = {
+  emoji: string;
+  userId: string;
+};
+
 export type Message = {
   id: string;
   thread_id: string;
@@ -22,6 +27,8 @@ export type Message = {
   body: string | null;
   attachment_url: string | null;
   attachment_type: string | null;
+  reply_to_id: string | null;
   created_at: string;
   readBy: string[];
+  reactions: Reaction[];
 };

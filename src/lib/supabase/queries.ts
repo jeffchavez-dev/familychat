@@ -37,8 +37,9 @@ export async function fetchThreads(): Promise<Thread[]> {
   }));
 }
 
-type RawMessageRow = Omit<Message, "readBy"> & {
+type RawMessageRow = Omit<Message, "readBy" | "reactions"> & {
   message_reads: { user_id: string }[] | null;
+  message_reactions: { user_id: string; emoji: string }[] | null;
 };
 
 export async function fetchMessages(threadId: string): Promise<Message[]> {
@@ -46,7 +47,7 @@ export async function fetchMessages(threadId: string): Promise<Message[]> {
 
   const { data, error } = await supabase
     .from("messages")
-    .select("*, message_reads(user_id)")
+    .select("*, message_reads(user_id), message_reactions(user_id, emoji)")
     .eq("thread_id", threadId)
     .order("created_at", { ascending: true })
     .returns<RawMessageRow[]>();
@@ -60,8 +61,10 @@ export async function fetchMessages(threadId: string): Promise<Message[]> {
     body: m.body,
     attachment_url: m.attachment_url,
     attachment_type: m.attachment_type,
+    reply_to_id: m.reply_to_id,
     created_at: m.created_at,
     readBy: (m.message_reads ?? []).map((r) => r.user_id),
+    reactions: (m.message_reactions ?? []).map((r) => ({ emoji: r.emoji, userId: r.user_id })),
   }));
 }
 
@@ -107,6 +110,7 @@ export async function sendMessage(params: {
   body: string | null;
   attachmentUrl?: string | null;
   attachmentType?: string | null;
+  replyToId?: string | null;
 }) {
   const supabase = createClient();
 
@@ -116,9 +120,36 @@ export async function sendMessage(params: {
     body: params.body,
     attachment_url: params.attachmentUrl ?? null,
     attachment_type: params.attachmentType ?? null,
+    reply_to_id: params.replyToId ?? null,
   });
 
   if (error) throw error;
+}
+
+export async function toggleReaction(
+  messageId: string,
+  userId: string,
+  emoji: string,
+): Promise<"added" | "removed"> {
+  const supabase = createClient();
+
+  const { data: deleted, error: deleteError } = await supabase
+    .from("message_reactions")
+    .delete()
+    .eq("message_id", messageId)
+    .eq("user_id", userId)
+    .eq("emoji", emoji)
+    .select();
+
+  if (deleteError) throw deleteError;
+  if (deleted && deleted.length > 0) return "removed";
+
+  const { error: insertError } = await supabase
+    .from("message_reactions")
+    .insert({ message_id: messageId, user_id: userId, emoji });
+
+  if (insertError) throw insertError;
+  return "added";
 }
 
 export async function markMessageRead(messageId: string, userId: string) {

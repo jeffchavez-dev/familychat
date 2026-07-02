@@ -14,6 +14,7 @@ import {
   setProfileAvatarPhoto,
   setThreadBackgroundPhoto,
   setThreadTheme,
+  toggleReaction,
   updatePassword,
   uploadAttachment,
 } from "@/lib/supabase/queries";
@@ -60,8 +61,8 @@ export function ChatApp({
           filter: `thread_id=eq.${selectedThreadId}`,
         },
         (payload) => {
-          const m = payload.new as Omit<Message, "readBy">;
-          setMessages((prev) => [...prev, { ...m, readBy: [] }]);
+          const m = payload.new as Omit<Message, "readBy" | "reactions">;
+          setMessages((prev) => [...prev, { ...m, readBy: [], reactions: [] }]);
           if (m.body && isEmojiOnly(m.body)) {
             setShower({ key: Date.now(), content: m.body });
           }
@@ -83,6 +84,47 @@ export function ChatApp({
             prev.map((m) =>
               m.id === message_id && !m.readBy.includes(user_id)
                 ? { ...m, readBy: [...m.readBy, user_id] }
+                : m,
+            ),
+          );
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "message_reactions" },
+        (payload) => {
+          const { message_id, user_id, emoji } = payload.new as {
+            message_id: string;
+            user_id: string;
+            emoji: string;
+          };
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === message_id
+                ? { ...m, reactions: [...m.reactions, { emoji, userId: user_id }] }
+                : m,
+            ),
+          );
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "message_reactions" },
+        (payload) => {
+          const { message_id, user_id, emoji } = payload.old as {
+            message_id: string;
+            user_id: string;
+            emoji: string;
+          };
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === message_id
+                ? {
+                    ...m,
+                    reactions: m.reactions.filter(
+                      (r) => !(r.emoji === emoji && r.userId === user_id),
+                    ),
+                  }
                 : m,
             ),
           );
@@ -124,11 +166,18 @@ export function ChatApp({
   );
 
   const handleSend = useCallback(
-    async (body: string) => {
+    async (body: string, replyToId: string | null) => {
       if (!selectedThreadId) return;
-      await sendMessage({ threadId: selectedThreadId, senderId: profile.id, body });
+      await sendMessage({ threadId: selectedThreadId, senderId: profile.id, body, replyToId });
     },
     [selectedThreadId, profile.id],
+  );
+
+  const handleReact = useCallback(
+    (messageId: string, emoji: string) => {
+      toggleReaction(messageId, profile.id, emoji);
+    },
+    [profile.id],
   );
 
   const handleSendAttachment = useCallback(
@@ -228,12 +277,14 @@ export function ChatApp({
       <div className={cn("min-w-0 flex-1", selectedThreadId ? "block" : "hidden md:block")}>
         {selectedThread ? (
           <ChatWindow
+            key={selectedThread.id}
             thread={selectedThread}
             messages={messages}
             currentUser={profile}
             onSend={handleSend}
             onSendAttachment={handleSendAttachment}
             onMarkRead={handleMarkRead}
+            onReact={handleReact}
             onBack={() => setSelectedThreadId(null)}
             onSetTheme={handleSetTheme}
             onSetBackgroundPhoto={handleSetBackgroundPhoto}

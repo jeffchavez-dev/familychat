@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { FunAvatar } from "@/components/chat/fun-avatar";
 import { insertMention, mentionQueryAt } from "@/lib/mentions";
-import type { Profile } from "@/lib/types";
+import { messagePreviewText } from "@/lib/message-preview";
+import type { Message, Profile } from "@/lib/types";
 
 const QUICK_EMOJIS = ["😂", "❤️", "👍", "🎉", "😢", "🐶"];
 
@@ -13,10 +14,16 @@ export function MessageInput({
   onSend,
   onSendAttachment,
   participants,
+  replyingTo,
+  replyingToSender,
+  onCancelReply,
 }: {
-  onSend: (body: string) => Promise<void>;
+  onSend: (body: string, replyToId: string | null) => Promise<void>;
   onSendAttachment: (file: File) => Promise<void>;
   participants: Profile[];
+  replyingTo: Message | null;
+  replyingToSender: Profile | undefined;
+  onCancelReply: () => void;
 }) {
   const [value, setValue] = useState("");
   const [sending, setSending] = useState(false);
@@ -36,7 +43,9 @@ export function MessageInput({
     setSending(true);
     setValue("");
     setMentionQuery(null);
-    await onSend(body);
+    const replyToId = replyingTo?.id ?? null;
+    onCancelReply();
+    await onSend(body, replyToId);
     setSending(false);
   }
 
@@ -69,6 +78,23 @@ export function MessageInput({
 
   return (
     <div className="space-y-2 border-t bg-card/60 p-3">
+      {replyingTo && (
+        <div className="flex items-center gap-2 rounded-2xl bg-muted px-3 py-2 text-xs">
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-foreground">
+              Replying to {replyingToSender?.full_name ?? "Unknown"}
+            </p>
+            <p className="truncate text-muted-foreground">{messagePreviewText(replyingTo)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancelReply}
+            className="shrink-0 rounded-full px-2 py-1 font-bold text-muted-foreground hover:bg-background"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <div className="flex gap-1.5 overflow-x-auto pb-0.5">
         {QUICK_EMOJIS.map((emoji) => (
           <button
