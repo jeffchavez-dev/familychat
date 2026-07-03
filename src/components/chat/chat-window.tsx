@@ -30,6 +30,7 @@ export function ChatWindow({
   onAddParticipants,
   onStartBuzzer,
   onStartUno,
+  onStartMemory,
 }: {
   thread: Thread;
   messages: Message[];
@@ -47,6 +48,7 @@ export function ChatWindow({
   onAddParticipants: (userIds: string[]) => Promise<void>;
   onStartBuzzer: () => void;
   onStartUno: () => void;
+  onStartMemory: () => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const backgroundPhotoUrl = useSignedUrl(thread.background_url);
@@ -138,6 +140,16 @@ export function ChatWindow({
             aria-label="Start Uno game"
           >
             🃏
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="rounded-full text-lg"
+            onClick={onStartMemory}
+            aria-label="Start memory game"
+          >
+            🧠
           </Button>
           <ThemeDialog
             currentTheme={thread.theme}

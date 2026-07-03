@@ -44,6 +44,17 @@ import {
   type UnoScore,
   type UnoWinner,
 } from "@/lib/uno-game";
+import { MemoryLobby, MemoryOverlay } from "@/components/chat/memory-overlay";
+import {
+  applyFlip,
+  dealRound as dealMemoryRound,
+  getWinners as getMemoryWinners,
+  isGameOver as isMemoryGameOver,
+  resolveTurn,
+  type MemoryPlayer,
+  type MemoryRoundSeed,
+  type MemoryRoundState,
+} from "@/lib/memory-game";
 import { AVATAR_PALETTE } from "@/lib/avatar-style";
 import { isEmojiOnly } from "@/lib/emoji";
 import type { Message, Profile, Thread } from "@/lib/types";
@@ -51,6 +62,10 @@ import type { Message, Profile, Thread } from "@/lib/types";
 // Kept short so the game keeps moving — long enough to see who won, short
 // enough that a 5-round game doesn't feel like it's stalling between rounds.
 const ROUND_TRANSITION_MS = 1800;
+
+// Long enough to actually study a mismatched pair (the whole point of a
+// memory game), short enough that the board doesn't feel stuck between turns.
+const MEMORY_FLIP_BACK_MS = 1200;
 
 export function ChatApp({
   currentUser,
@@ -73,6 +88,9 @@ export function ChatApp({
   const [unoRound, setUnoRound] = useState<UnoRoundState | null>(null);
   const [unoWinner, setUnoWinner] = useState<UnoWinner | null>(null);
   const [unoScores, setUnoScores] = useState<Record<string, UnoScore>>({});
+  const [memoryLobbyOpen, setMemoryLobbyOpen] = useState(false);
+  const [memoryRound, setMemoryRound] = useState<MemoryRoundState | null>(null);
+  const [memoryWinners, setMemoryWinners] = useState<MemoryPlayer[] | null>(null);
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
   const channelReadyRef = useRef(false);
   // Mirrors unoRound outside React state so broadcast handlers can read/write
@@ -82,6 +100,9 @@ export function ChatApp({
   // dev-mode double-invocation of updater functions double-fire the
   // setUnoScores/setShower side effects nested inside it.
   const unoRoundRef = useRef<UnoRoundState | null>(null);
+  // Same reason as unoRoundRef: the resolve-turn step needs the latest board
+  // inside a broadcast handler without a stale closure.
+  const memoryRoundRef = useRef<MemoryRoundState | null>(null);
   const onlineIds = usePresence(profile.id);
 
   // Reset any active game when switching threads. Adjusting state directly
@@ -99,6 +120,9 @@ export function ChatApp({
     setUnoRound(null);
     setUnoWinner(null);
     setUnoScores({});
+    setMemoryLobbyOpen(false);
+    setMemoryRound(null);
+    setMemoryWinners(null);
   }
 
   useEffect(() => {
@@ -192,6 +216,42 @@ export function ChatApp({
         const next = applyDrawCard(prev, move.userId);
         unoRoundRef.current = next;
         setUnoRound(next);
+      })
+      .on("broadcast", { event: "start_memory_lobby" }, () => {
+        setMemoryLobbyOpen(true);
+      })
+      .on("broadcast", { event: "start_memory_round" }, (payload) => {
+        const seed = payload.payload as MemoryRoundSeed;
+        const dealt = dealMemoryRound(seed);
+        memoryRoundRef.current = dealt;
+        setMemoryRound(dealt);
+        setMemoryWinners(null);
+        setMemoryLobbyOpen(false);
+      })
+      .on("broadcast", { event: "flip_memory_card" }, (payload) => {
+        const move = payload.payload as {
+          gameId: string;
+          roundId: string;
+          userId: string;
+          cardIndex: number;
+        };
+        const prev = memoryRoundRef.current;
+        if (!prev || prev.roundId !== move.roundId) return;
+        const next = applyFlip(prev, move.userId, move.cardIndex);
+        memoryRoundRef.current = next;
+        setMemoryRound(next);
+        if (isMemoryGameOver(next)) {
+          setMemoryWinners(getMemoryWinners(next));
+          setShower({ key: Date.now(), content: "🏆" });
+        }
+      })
+      .on("broadcast", { event: "resolve_memory_turn" }, (payload) => {
+        const move = payload.payload as { gameId: string; roundId: string };
+        const prev = memoryRoundRef.current;
+        if (!prev || prev.roundId !== move.roundId) return;
+        const next = resolveTurn(prev);
+        memoryRoundRef.current = next;
+        setMemoryRound(next);
       })
       .on(
         "postgres_changes",
@@ -573,6 +633,70 @@ export function ChatApp({
     setUnoScores({});
   }, []);
 
+  const handleStartMemory = useCallback(() => {
+    setMemoryLobbyOpen(true);
+    waitForReadyChannel().then((channel) => {
+      channel?.send({
+        type: "broadcast",
+        event: "start_memory_lobby",
+        payload: { gameId: crypto.randomUUID(), openedBy: profile.id, openedByName: profile.full_name },
+      });
+    });
+  }, [profile.id, profile.full_name, waitForReadyChannel]);
+
+  const handleStartMemoryGame = useCallback(
+    async (selectedPlayerIds: string[], totalPairs: number) => {
+      const channel = await waitForReadyChannel();
+      if (!channel) return;
+
+      const players: MemoryPlayer[] = selectedPlayerIds
+        .map((id) => allProfiles.find((p) => p.id === id))
+        .filter((p): p is Profile => !!p)
+        .map((p) => ({
+          userId: p.id,
+          name: p.full_name,
+          avatarKey: p.avatar_key,
+          avatarUrl: p.avatar_url,
+        }));
+      if (players.length < 2) return;
+
+      const seed: MemoryRoundSeed = {
+        gameId: crypto.randomUUID(),
+        roundId: crypto.randomUUID(),
+        totalPairs,
+        players,
+        startedBy: profile.id,
+        startedByName: profile.full_name,
+      };
+      channel.send({ type: "broadcast", event: "start_memory_round", payload: seed });
+    },
+    [allProfiles, profile.id, profile.full_name, waitForReadyChannel],
+  );
+
+  const handleFlipMemoryCard = useCallback(
+    (cardIndex: number) => {
+      if (!channelRef.current || !memoryRound || memoryRound.currentPlayerId !== profile.id) return;
+      channelRef.current.send({
+        type: "broadcast",
+        event: "flip_memory_card",
+        payload: {
+          gameId: memoryRound.gameId,
+          roundId: memoryRound.roundId,
+          userId: profile.id,
+          cardIndex,
+        },
+      });
+    },
+    [memoryRound, profile.id],
+  );
+
+  const handleCloseMemory = useCallback(() => {
+    setMemoryLobbyOpen(false);
+    setMemoryRound(null);
+    memoryRoundRef.current = null;
+    setMemoryWinners(null);
+  }, []);
+
   // Once a round has a winner, the player who started the game (and only
   // that player, so every device doesn't race to broadcast the same round)
   // advances to the next round after a short pause.
@@ -625,6 +749,26 @@ export function ChatApp({
     return () => clearTimeout(timer);
   }, [unoWinner, unoRound, profile.id]);
 
+  // Once a flip resolves to a match or mismatch, only the player who caused
+  // it (lastActorId) broadcasts the clear-and-advance step, so devices don't
+  // race to send the same resolution.
+  useEffect(() => {
+    if (!memoryRound || memoryRound.pendingMatch === null) return;
+    if (memoryRound.lastActorId !== profile.id) return;
+
+    const timer = setTimeout(() => {
+      const channel = channelRef.current;
+      if (!channel || !channelReadyRef.current || !memoryRound) return;
+      channel.send({
+        type: "broadcast",
+        event: "resolve_memory_turn",
+        payload: { gameId: memoryRound.gameId, roundId: memoryRound.roundId },
+      });
+    }, MEMORY_FLIP_BACK_MS);
+
+    return () => clearTimeout(timer);
+  }, [memoryRound, profile.id]);
+
   const selectedThread = threads.find((t) => t.id === selectedThreadId);
 
   return (
@@ -671,6 +815,24 @@ export function ChatApp({
           onClose={handleCloseUno}
         />
       )}
+      {memoryLobbyOpen && (
+        <MemoryLobby
+          threadParticipants={selectedThread?.participants ?? []}
+          onlineIds={onlineIds}
+          currentUserId={profile.id}
+          onStartGame={handleStartMemoryGame}
+          onClose={handleCloseMemory}
+        />
+      )}
+      {memoryRound && (
+        <MemoryOverlay
+          round={memoryRound}
+          winners={memoryWinners}
+          currentUserId={profile.id}
+          onFlipCard={handleFlipMemoryCard}
+          onClose={handleCloseMemory}
+        />
+      )}
       <div className={cn("w-full shrink-0 md:block md:w-72", selectedThreadId ? "hidden md:block" : "block")}>
         <Sidebar
           currentUser={profile}
@@ -706,6 +868,7 @@ export function ChatApp({
             onAddParticipants={handleAddParticipants}
             onStartBuzzer={handleStartBuzzer}
             onStartUno={handleStartUno}
+            onStartMemory={handleStartMemory}
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
