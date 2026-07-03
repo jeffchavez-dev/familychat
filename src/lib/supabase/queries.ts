@@ -67,6 +67,7 @@ export async function fetchMessages(threadId: string): Promise<Message[]> {
     attachment_type: m.attachment_type,
     reply_to_id: m.reply_to_id,
     created_at: m.created_at,
+    message_type: m.message_type,
     readBy: (m.message_reads ?? []).map((r) => r.user_id),
     reactions: (m.message_reactions ?? []).map((r) => ({ emoji: r.emoji, userId: r.user_id })),
   }));
@@ -135,6 +136,17 @@ export async function sendMessage(params: {
     reply_to_id: params.replyToId ?? null,
   });
 
+  if (error) throw error;
+}
+
+export async function sendGameNote(threadId: string, senderId: string, body: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("messages").insert({
+    thread_id: threadId,
+    sender_id: senderId,
+    body,
+    message_type: "game_note",
+  });
   if (error) throw error;
 }
 

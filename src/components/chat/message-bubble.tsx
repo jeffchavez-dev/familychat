@@ -34,6 +34,16 @@ export function MessageBubble({
   const senderColor = sender ? avatarStyle(sender.id, sender.avatar_key).bg : "#4ECDC4";
   const bodySegments = message.body ? splitMentions(message.body, participants) : [];
 
+  if (message.message_type === "game_note") {
+    return (
+      <div className="flex justify-center">
+        <span className="rounded-full bg-card/85 px-3 py-1 text-center text-xs font-semibold text-muted-foreground shadow-sm backdrop-blur-sm">
+          {message.body}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(

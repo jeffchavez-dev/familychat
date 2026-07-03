@@ -39,8 +39,16 @@ create table if not exists messages (
   attachment_url text,
   attachment_type text,
   reply_to_id uuid references messages (id) on delete set null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- 'game_note' rows are auto-posted when a mini-game finishes (e.g. "X and Y
+  -- played Uno"); sent by the game's startedBy player like any other message,
+  -- just rendered differently client-side. Everything else is 'text'.
+  message_type text not null default 'text'
 );
+
+-- Existing databases created before message_type existed need this applied
+-- manually (no migration runner in this project) — safe no-op if already run.
+alter table messages add column if not exists message_type text not null default 'text';
 
 create table if not exists message_reads (
   message_id uuid not null references messages (id) on delete cascade,

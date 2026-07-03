@@ -31,6 +31,7 @@ export type Message = {
   attachment_type: string | null;
   reply_to_id: string | null;
   created_at: string;
+  message_type: "text" | "game_note";
   readBy: string[];
   reactions: Reaction[];
 };

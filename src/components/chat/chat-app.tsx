@@ -11,6 +11,7 @@ import {
   fetchMessages,
   fetchThreads,
   markMessageRead,
+  sendGameNote,
   sendMessage,
   setProfileAvatarKey,
   setProfileAvatarPhoto,
@@ -22,6 +23,7 @@ import {
   updatePassword,
   uploadAttachment,
 } from "@/lib/supabase/queries";
+import { formatGameNote } from "@/lib/game-note";
 import { Sidebar } from "@/components/chat/sidebar";
 import { ChatWindow } from "@/components/chat/chat-window";
 import { EmojiShower } from "@/components/chat/emoji-shower";
@@ -103,6 +105,11 @@ export function ChatApp({
   // Same reason as unoRoundRef: the resolve-turn step needs the latest board
   // inside a broadcast handler without a stale closure.
   const memoryRoundRef = useRef<MemoryRoundState | null>(null);
+  // BuzzerWinner payloads don't carry startedBy/scores (unlike Uno/memory's
+  // round state), so these mirror the plain buzzerRound/buzzerScores state
+  // to avoid reading a stale snapshot inside the long-lived channel effect.
+  const buzzerRoundRef = useRef<BuzzerRound | null>(null);
+  const buzzerScoresRef = useRef<Record<string, BuzzerScore>>({});
   const onlineIds = usePresence(profile.id);
 
   // Reset any active game when switching threads. Adjusting state directly
@@ -141,24 +148,34 @@ export function ChatApp({
       .channel(`thread-${selectedThreadId}`, { config: { broadcast: { self: true } } })
       .on("broadcast", { event: "start_round" }, (payload) => {
         const round = payload.payload as BuzzerRound;
+        buzzerRoundRef.current = round;
         setBuzzerRound(round);
         setBuzzerWinner(null);
         setBuzzerSetupOpen(false);
         setHasBuzzed(false);
-        if (round.roundNumber === 1) setBuzzerScores({});
+        if (round.roundNumber === 1) {
+          buzzerScoresRef.current = {};
+          setBuzzerScores({});
+        }
       })
       .on("broadcast", { event: "buzz" }, (payload) => {
         const winner = payload.payload as BuzzerWinner;
         setBuzzerWinner((prev) => (prev && prev.roundId === winner.roundId ? prev : winner));
-        setBuzzerScores((prev) => ({
-          ...prev,
+        const mergedScores = {
+          ...buzzerScoresRef.current,
           [winner.userId]: {
             name: winner.userName,
-            wins: (prev[winner.userId]?.wins ?? 0) + 1,
+            wins: (buzzerScoresRef.current[winner.userId]?.wins ?? 0) + 1,
           },
-        }));
+        };
+        buzzerScoresRef.current = mergedScores;
+        setBuzzerScores(mergedScores);
         if (winner.roundNumber === winner.totalRounds) {
           setShower({ key: Date.now(), content: "🏆" });
+          if (selectedThreadId && buzzerRoundRef.current?.startedBy === profile.id) {
+            const participantNames = Object.values(mergedScores).map((s) => s.name);
+            sendGameNote(selectedThreadId, profile.id, formatGameNote(participantNames, "Buzzer 🎮"));
+          }
         }
       })
       .on("broadcast", { event: "start_uno_lobby" }, () => {
@@ -206,6 +223,10 @@ export function ChatApp({
           }));
           if (roundWinner.roundNumber === roundWinner.totalRounds) {
             setShower({ key: Date.now(), content: "🏆" });
+            if (selectedThreadId && next.startedBy === profile.id) {
+              const participantNames = next.players.map((p) => p.name);
+              sendGameNote(selectedThreadId, profile.id, formatGameNote(participantNames, "Uno 🃏"));
+            }
           }
         }
       })
@@ -243,6 +264,10 @@ export function ChatApp({
         if (isMemoryGameOver(next)) {
           setMemoryWinners(getMemoryWinners(next));
           setShower({ key: Date.now(), content: "🏆" });
+          if (selectedThreadId && next.startedBy === profile.id) {
+            const participantNames = next.players.map((p) => p.name);
+            sendGameNote(selectedThreadId, profile.id, formatGameNote(participantNames, "Memory Match 🧠"));
+          }
         }
       })
       .on("broadcast", { event: "resolve_memory_turn" }, (payload) => {
@@ -369,6 +394,9 @@ export function ChatApp({
       channelRef.current = null;
       supabase.removeChannel(channel);
     };
+    // profile.id is the logged-in user's own id and doesn't change mid-session;
+    // adding it here would just resubscribe the channel pointlessly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedThreadId]);
 
   const handleCreateThread = useCallback(
