@@ -292,3 +292,13 @@ export async function createFamilyMember(name: string, password: string): Promis
     throw new Error(error ?? "Couldn't add family member.");
   }
 }
+
+export async function hasPushSubscription(userId: string): Promise<boolean> {
+  const supabase = createClient();
+  const { count, error } = await supabase
+    .from("push_subscriptions")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId);
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
